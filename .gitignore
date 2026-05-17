@@ -1,0 +1,14 @@
+# 証明書・秘密鍵（絶対にコミットしない）
+certs/
+*.pem
+*.key
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS
+.DS_Store

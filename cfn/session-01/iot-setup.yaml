@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "JAWS-UG IoT Handson - Creates IoT Thing and Policy. Issue the certificate manually (private key cannot be retrieved via CloudFormation)."
+
+# ------------------------------------------------------------
+# パラメータ
+# ------------------------------------------------------------
+Parameters:
+  EventId:
+    Type: String
+    Default: "2026-05"
+    Description: "Event year-month (e.g. 2026-05). Used as the MQTT topic prefix."
+
+  DeviceId:
+    Type: String
+    Default: "raspi-001"
+    Description: "Device ID assigned by the instructor (e.g. raspi-001, sim-001)."
+
+# ------------------------------------------------------------
+# リソース
+# ------------------------------------------------------------
+Resources:
+
+  # IoT Thing
+  IoTThing:
+    Type: AWS::IoT::Thing
+    Properties:
+      ThingName: !Sub "jawsug-${DeviceId}"
+
+  # IoT Policy（ハンズオン用・広めの設定）
+  IoTPolicy:
+    Type: AWS::IoT::Policy
+    Properties:
+      PolicyName: !Sub "jawsug-handson-policy-${DeviceId}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - iot:Connect
+              - iot:Publish
+              - iot:Subscribe
+              - iot:Receive
+            Resource: !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:*"
+
+# ------------------------------------------------------------
+# 出力
+# ------------------------------------------------------------
+Outputs:
+  ThingName:
+    Description: "IoT Thing name"
+    Value: !Ref IoTThing
+
+  PolicyName:
+    Description: "IoT Policy name"
+    Value: !Ref IoTPolicy
+
+  TopicTelemetry:
+    Description: "MQTT topic for telemetry (set this in your code)"
+    Value: !Sub "jawsug/${EventId}/${DeviceId}/telemetry"
+
+  NextStep:
+    Description: "Next steps"
+    Value: !Sub >
+      [1] Issue certificate:
+      IoT Core > Manage > Things > jawsug-${DeviceId} > Certificates > Create certificate
+      > Download files (certificate.pem.crt / private.pem.key / AmazonRootCA1.pem)
+      > Click Activate
+      > Attach policy: jawsug-handson-policy-${DeviceId}
+      [2] Get Endpoint:
+      IoT Core > Settings > Device data endpoint > Copy endpoint
