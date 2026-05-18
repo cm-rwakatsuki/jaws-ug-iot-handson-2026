@@ -309,12 +309,8 @@ Raspberry Pi をお持ちでない方向けです。PC 上で動作します。
 ### 必要なライブラリ
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install paho-mqtt  # または pip3
+pip3 install paho-mqtt
 ```
-
-> 💡 OS によっては `pip3 install` 実行時に `error: externally-managed-environment` が発生します。venv を使ってインストールしてください。
 
 ### ディレクトリ構成
 
@@ -344,7 +340,6 @@ DEVICE_ID = "raspi-001"  # 好きな番号でOK（例：raspi-001）
 
 ```bash
 cd scripts/session-01
-source venv/bin/activate
 export AWS_IOT_ENDPOINT="xxxxxx-ats.iot.ap-northeast-1.amazonaws.com"  # 自分のEndpointに書き換える
 python3 simulator.py
 ```
