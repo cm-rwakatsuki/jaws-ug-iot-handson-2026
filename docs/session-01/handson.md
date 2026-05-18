@@ -235,7 +235,7 @@ Raspberry Pi 上で以下を実行します。
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install paho-mqtt  # pip3 でも可
+pip install paho-mqtt  # または pip3
 ```
 
 > 💡 最新の Raspberry Pi OS では `pip3 install` 実行時に `error: externally-managed-environment` が発生します。venv を使ってインストールしてください。
@@ -311,7 +311,7 @@ Raspberry Pi をお持ちでない方向けです。PC 上で動作します。
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install paho-mqtt  # pip3 でも可
+pip install paho-mqtt  # または pip3
 ```
 
 > 💡 OS によっては `pip3 install` 実行時に `error: externally-managed-environment` が発生します。venv を使ってインストールしてください。
