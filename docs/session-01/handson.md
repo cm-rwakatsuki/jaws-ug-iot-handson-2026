@@ -233,8 +233,12 @@ aws iot describe-endpoint --endpoint-type iot:Data-ATS --region ap-northeast-1
 Raspberry Pi 上で以下を実行します。
 
 ```bash
-pip3 install paho-mqtt
+python3 -m venv venv
+source venv/bin/activate
+pip install paho-mqtt
 ```
+
+> 💡 最新の Raspberry Pi OS では `pip3 install` 実行時に `error: externally-managed-environment` が発生します。venv を使ってインストールしてください。
 
 ### 証明書の配置
 
@@ -278,6 +282,7 @@ DEVICE_ID = "raspi-001"  # 好きな番号でOK（例：raspi-001）
 ### 実行
 
 ```bash
+source venv/bin/activate
 python3 device.py
 ```
 
@@ -304,8 +309,12 @@ Raspberry Pi をお持ちでない方向けです。PC 上で動作します。
 ### 必要なライブラリ
 
 ```bash
-pip3 install paho-mqtt
+python3 -m venv venv
+source venv/bin/activate
+pip install paho-mqtt
 ```
+
+> 💡 OS によっては `pip3 install` 実行時に `error: externally-managed-environment` が発生します。venv を使ってインストールしてください。
 
 ### ディレクトリ構成
 
@@ -335,6 +344,7 @@ DEVICE_ID = "raspi-001"  # 好きな番号でOK（例：raspi-001）
 
 ```bash
 cd scripts/session-01
+source venv/bin/activate
 export AWS_IOT_ENDPOINT="xxxxxx-ats.iot.ap-northeast-1.amazonaws.com"  # 自分のEndpointに書き換える
 python3 simulator.py
 ```
@@ -379,7 +389,7 @@ Connecting to xxxxxx-ats.iot.ap-northeast-1.amazonaws.com...
 | 接続できるがデータが届かない | Policyが証明書にアタッチされていない | Thing → 証明書タブ → 「ポリシー」タブを確認 |
 | Wi-Fi接続できない（Raspberry Pi） | SSID/パスワードミス or 5GHz帯 | 2.4GHz帯のSSIDを使用 |
 | ポート8883がブロックされる | 企業ネットワーク・VPN | テザリングに切り替える |
-| `paho-mqtt` のインポートエラー | ライブラリ未インストール | `pip3 install paho-mqtt` を実行 |
+| `paho-mqtt` のインポートエラー | ライブラリ未インストール、または venv 未アクティベート | `source venv/bin/activate` を実行してから `python3` を起動 |
 | SSH で Raspberry Pi に繋がらない | IP アドレス不明 | `ping raspberrypi.local` で確認、または HDMI でIPを確認 |
 
 ---
