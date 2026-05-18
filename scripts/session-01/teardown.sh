@@ -14,8 +14,17 @@ echo "=== JAWS-UG IoT Handson - 後片付け ==="
 echo "Thing: $THING_NAME  /  Region: $REGION"
 echo ""
 
+# AWS 認証情報の確認
+echo "[0/4] AWS 認証情報を確認しています..."
+if ! aws sts get-caller-identity --region "$REGION" > /dev/null 2>&1; then
+  echo "❌ AWS 認証情報が取得できません。aws configure または assume-role の設定を確認してください。"
+  exit 1
+fi
+echo "✅ AWS 認証情報確認済み"
+echo ""
+
 # 1. Thing にアタッチされた証明書を取得・デタッチ・削除
-echo "[1/3] 証明書を削除しています..."
+echo "[1/4] 証明書を削除しています..."
 PRINCIPALS=$(aws iot list-thing-principals \
   --thing-name "$THING_NAME" \
   --region "$REGION" \
