@@ -3,8 +3,6 @@
 ## ゴール
 
 - Raspberry Pi（またはPythonシミュレーター）を AWS IoT Core に接続する
-- MQTTで温度データをPublishする
-- MQTT Test Clientでデータ受信を確認する
 
 ---
 
