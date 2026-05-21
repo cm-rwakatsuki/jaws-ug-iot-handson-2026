@@ -229,7 +229,7 @@ aws iot describe-endpoint --endpoint-type iot:Data-ATS --region ap-northeast-1
 ### Wi-Fi 接続と SSH 接続
 
 1. PC を専用 Wi-Fi（`JAWSUG-IoT-PC`）に接続します。
-2. ラズパイの電源を入れます。ラズパイの Wi-Fi 接続は設定済みです（`JAWSUG-IoT-Pi`）。
+2. ラズパイの電源を入れます。
 3. ラズパイに SSH で接続します。
 
 ```bash
@@ -239,6 +239,8 @@ ssh jawsug-user@ラズパイに記載の名前.local
 # または IP アドレスで接続する場合（ラズパイ本体に記載の IP を使用）
 ssh jawsug-user@ラズパイに記載のIP
 ```
+
+ラズパイの Wi-Fi 接続は設定済みです（`JAWSUG-IoT-Pi`）。
 
 ### 必要なライブラリ
 
