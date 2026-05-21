@@ -6,8 +6,6 @@
 - MQTTで温度データをPublishする
 - MQTT Test Clientでデータ受信を確認する
 
-> 質問は Slido の Q&A へ、感想・実況は X `#jawsug_iot` `#jawsug` へ。進捗確認は Slido 投票を使います。
-
 ---
 
 ## 参加形式別の進め方
