@@ -18,6 +18,7 @@ JAWS-UG IoT 専門支部 IoT Core ハンズオン（全3回）のハンズオン
 │   ├── session-01/
 │   │   └── handson.md           # 参加者向けハンズオン手順書
 │   ├── session-02/
+│   │   └── handson.md           # 参加者向けハンズオン手順書
 │   └── session-03/
 ├── scripts/
 │   ├── session-01/
@@ -25,16 +26,20 @@ JAWS-UG IoT 専門支部 IoT Core ハンズオン（全3回）のハンズオン
 │   │   ├── simulator.py         # PC 用シミュレーター（ランダム温度を送信）
 │   │   └── teardown.sh          # 後片付けスクリプト
 │   ├── session-02/
+│   │   ├── shadow_led.py        # Raspberry Pi 用スクリプト（Shadow deltaでACT LED制御）
+│   │   ├── led_ctrl.sh          # ACT LED を ON/OFF するシェルスクリプト
+│   │   └── teardown.sh          # 後片付けスクリプト
 │   └── session-03/
 └── cfn/
     ├── session-01/
     │   └── iot-setup.yaml       # CloudFormation テンプレート（Thing + Policy）
     ├── session-02/
+    │   └── iot-setup.yaml       # CloudFormation テンプレート（Thing + Policy）
     └── session-03/
 ```
 
 ## ハンズオン手順
 
 - 第1回：[docs/session-01/handson.md](docs/session-01/handson.md)
-- 第2回：T.B.D.
+- 第2回：[docs/session-02/handson.md](docs/session-02/handson.md)
 - 第3回：T.B.D.
