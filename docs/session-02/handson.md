@@ -33,12 +33,6 @@ AWS 側の設定（Thing・証明書・Policy）から Raspberry Pi の実装ま
 
 ## 学習内容
 
-### 双方向通信とは
-
-MQTT では主にデバイス → クラウドの一方向でデータを送ります。今回はクラウド → デバイスの制御を加えた**双方向通信**を体験します。
-
-![第2回 構成図：Device Shadow によるクラウドからのデバイス制御フロー](./architecture.drawio.svg)
-
 ### Device Shadow とは
 
 Device Shadow は、デバイスの「あるべき状態（`desired`）」と「現在の状態（`reported`）」をクラウド上で管理する仕組みです。
@@ -79,6 +73,27 @@ $aws/things/{thingName}/shadow/get/accepted     # 取得成功（Subscribe）
 ```
 
 > 今回は **Classic Shadow**（名前なしシャドウ）を使用します。上記の Topic はすべて Classic Shadow のものです。
+
+### 今回やること・作るもの
+
+MQTT では主にデバイス → クラウドの一方向でデータを送ります。今回はクラウド → デバイスの制御を加えた**双方向通信**を体験します。
+
+![第2回 構成図：Device Shadow によるクラウドからのデバイス制御フロー](./architecture.drawio.svg)
+
+構成図の各要素は、次の流れで用意・実行します（かっこ内は図中の記述）。
+
+**準備（作るもの）**
+
+1. AWS 側に **モノ（Thing）** を作成し、その中に **証明書（X.509）** と **Device Shadow（Classic）** を用意する（図の *AWS Cloud* 内「**モノ（Thing）：jawsug-raspi-001**」）
+2. Raspberry Pi 側に `shadow_led.py` と `led_ctrl.sh`、ダウンロードした **証明書類（certs/）** を配置する（図の *Raspberry Pi（実機）*）
+3. デバイスは証明書を使って AWS IoT Core に接続する（図「**TLS 相互認証**」＝ MQTT/TLS 8883）
+
+**動作の流れ**
+
+4. 運用者がマネジメントコンソールから Shadow の `desired` を更新する（図 **① desired 更新 `{ led: on }`**）
+5. AWS IoT Core が差分を `delta` としてデバイスに通知する（図 **② delta 通知**：`$aws/things/.../shadow/update/delta`）
+6. `shadow_led.py` が `led_ctrl.sh` を呼び出し、**ACT LED（緑）** を点灯／消灯する（図 **③ 点灯 / 消灯**）
+7. デバイスが `reported` を更新し、`desired` と一致すると `delta` が空になる（図 **④ reported 更新**）
 
 ---
 
