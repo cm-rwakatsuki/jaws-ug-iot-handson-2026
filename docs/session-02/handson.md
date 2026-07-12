@@ -498,11 +498,71 @@ Raspberry Pi 側で `shadow_led.py` を起動したまま、以下を操作し�
 
 ---
 
-## 発展課題（時間が余ったら）
+## 発展課題（時間が余ったら）：デバイスがオフラインになり、オンライン復帰時に状態が同期される様子を見る
 
-- Shadow の `get` を使って起動時に最新状態を取得する
-- ボタン入力で `reported` を更新してみる
-- 温度データの Publish（デバイス → クラウドの送信）と組み合わせる
+Device Shadow の本領である「**デバイスがオフライン（今回はスクリプト停止）中に `desired` を更新しておき、再開時にまとめて同期する**」挙動を体験します。Wi-Fi は操作しないので、SSH が切れて戻れなくなる心配はありません。
+
+### 仕組み
+
+- スクリプトを止めている間は、デバイスがオフラインなのと同じ状態です。この間に `desired` を更新すると、Shadow に `desired ≠ reported` の差分（`delta`）が残ります。
+- `delta` の通知（`update/delta`）は**更新の瞬間に一度だけ**配信されるため、止まっていたデバイスはそれを受け取れません。
+- 本スクリプト（`shadow_led.py`）は**接続時に Shadow を取得（`get`）** する実装のため、再開（再接続）した瞬間に、たまっていた `delta` を拾って反映します。
+
+### 1. スクリプトを停止する（オフライン状態を作る）
+
+`shadow_led.py` を実行中のターミナルで `Ctrl+C` を押して停止します。
+
+```
+^C
+Stopped.
+[LED] OFF
+```
+
+> 停止するとデバイスは Shadow の更新を受け取れなくなります（＝オフライン状態）。LED は停止前の状態のまま残ります。
+
+### 2. 停止中にマネジメントコンソールから `desired` を更新する
+
+`delta`（差分）を発生させるため、**今の状態と逆**の値を `desired` に設定します（「動作確認」と同じ要領で、Shadow ドキュメントを編集して保存）。
+
+- 今 LED が **消灯**している → `on` にする
+- 今 LED が **点灯**している → `off` にする
+
+```json
+{ "state": { "desired": { "led": "on" } } }
+```
+
+```json
+{ "state": { "desired": { "led": "off" } } }
+```
+
+- スクリプトは止まっているので、**LED はまだ変化しません**。
+- Shadow ドキュメントを見ると、`desired` と `reported` が食い違い、`delta` に設定した値（例：`{ "led": "on" }`）が**残っている**ことが確認できます（＝指示が保留されている状態）。
+
+### 3. スクリプトを再開する（保留された delta が反映される）
+
+もう一度スクリプトを起動します。
+
+```bash
+cd ~/session-02
+source venv/bin/activate   # まだ venv に入っていない場合
+python3 shadow_led.py
+```
+
+再接続時の `get` で保留中の `delta` を検出し、LED に反映します。ターミナルには次のように出力されます。
+
+```
+Waiting for Shadow delta...
+[OK] Connected to AWS IoT Core
+[SUB] Subscribed: $aws/things/jawsug-raspi-001/shadow/update/delta
+[GET] 未反映の delta を検出: led=on
+[LED] ON
+[SEND] Reported updated: led=on
+```
+
+- 手順2で設定した `desired` に応じて、Raspberry Pi の **ACT LED（緑）が点灯／消灯**します（上の例は `on` の場合）。
+- Shadow ドキュメントでは `reported` が `desired` と同じ値に更新され、`delta` が**空**になります。
+
+> これが「オフライン中に出した指示を、再接続時に自動で同期する」Device Shadow の中心的な価値です。
 
 ---
 
