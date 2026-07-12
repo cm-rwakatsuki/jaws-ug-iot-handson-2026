@@ -22,13 +22,12 @@ AWS 側の設定（Thing・証明書・Policy）から Raspberry Pi の実装ま
 
 | パート | 時間 |
 |---|---|
-| Wi-Fi 接続と SSH 接続（会場参加のみ） | 15分 |
-| Device Shadow の概念 | 20分 |
-| AWS 側設定（Thing・証明書・Policy） | 20分 |
+| Wi-Fi 接続と SSH 接続（会場参加のみ） | 10分 |
+| AWS 側設定（Thing・証明書・Policy） | 25分 |
 | デバイス側実装（Shadow Subscribe + LED 制御） | 30分 |
 | 動作確認（マネコンから LED 操作） | 20分 |
-| 応用・質疑 | 10分 |
-| **合計** | **115分** |
+| 応用・質疑 | 5分 |
+| **合計** | **90分** |
 
 ---
 
@@ -105,7 +104,7 @@ $aws/things/{thingName}/shadow/get/accepted     # 取得成功（Subscribe）
 #### 2. スタックの作成
 
 1. AWS マネジメントコンソール →（東京リージョン）→ **CloudFormation** →「スタックの作成」→「新しいリソースを使用」
-2. 「テンプレートファイルのアップロード」→ `iot-setup.yaml` を選択
+2. 「テンプレートファイルのアップロード」→ `cfn/session-02/iot-setup.yaml` を選択
 3. スタック名：`jawsug-iot-handson-s2-001`
 4. パラメータを入力：
    - `DeviceId`：`raspi-001`（好きな番号で OK）
@@ -119,8 +118,9 @@ $aws/things/{thingName}/shadow/get/accepted     # 取得成功（Subscribe）
 | キー | 内容 |
 |---|---|
 | `ThingName` | IoT コンソール上のモノの名前（`jawsug-raspi-001` 形式） |
-| `ShadowDeltaTopic` | デバイスがサブスクライブする delta トピック |
-| `NextStep` | 次の手順（証明書発行・Endpoint 取得）の案内 |
+| `ShadowDeltaTopic` | デバイスがサブスクライブする delta トピック（`$aws/things/jawsug-raspi-001/shadow/update/delta` 形式） |
+
+> 控えておくのはこの2つで十分です。`NextStep` などその他の出力は使いません。
 
 #### 4. 証明書の発行（手動・必須）
 
@@ -142,7 +142,8 @@ CloudFormation では秘密鍵を取得できないため、証明書だけ手�
 > 💡 ダイアログを閉じてしまった場合：「証明書」タブの証明書 ID リンクをクリック → 証明書詳細ページの「アクション」→「有効化」
 
 5. 「完了」をクリックしてダイアログを閉じる
-6. 証明書詳細ページの「ポリシー」タブ →「ポリシーをアタッチ」→ `jawsug-handson-policy-{DeviceId}` を選択してアタッチ
+6. `jawsug-{DeviceId}` の「証明書」タブに戻ると、作成した証明書が一覧に表示される。証明書 ID のリンクをクリックして**証明書の詳細ページ**を開く
+7. 証明書詳細ページの「ポリシー」タブ →「ポリシーをアタッチ」→ `jawsug-handson-policy-{DeviceId}` を選択してアタッチ
 
 > ⚠️ プライベートキーはこの画面でしかダウンロードできません。必ず保存してください。
 
@@ -259,96 +260,119 @@ ssh jawsug-user@ラズパイに記載のIP
 
 ## 実装（Raspberry Pi）
 
-### 必要なライブラリ
+スクリプトは **PC 側（クローンしたリポジトリの `scripts/session-02/`）** で設定を書き換え、証明書とあわせて Raspberry Pi に転送してから実行します。
 
-Raspberry Pi 上で以下を実行します。
+### Raspberry Pi の LED（ACT LED）について
+
+今回は基板上の **ACT LED（緑色の LED）** を制御します。GPIO へのハンダ付けや外付け部品は不要です。
+
+ACT LED は通常 SD カードアクセスに連動していますが、`sysfs`（`/sys/class/leds/` 以下の擬似ファイル）経由でトリガーを解除することで、自由に点灯・消灯できます。
+
+- LED ON  … ACT LED の `brightness` に `1` を書き込む
+- LED OFF … ACT LED の `brightness` に `0` を書き込む
+
+`sysfs` 上の ACT LED のパスは Raspberry Pi OS のバージョンで異なります。
+
+| Raspberry Pi OS | ACT LED の sysfs パス |
+|---|---|
+| 新しい OS（Bookworm 以降） | `/sys/class/leds/ACT` |
+| 古い OS | `/sys/class/leds/led0` |
+
+> 今回配布する Raspberry Pi は新しい OS のため `/sys/class/leds/ACT` を使います。`led_ctrl.sh` は両方のパスを自動判定するので、通常はそのまま動作します。LED の操作には `sudo` が必要です。
+
+### ① PC 側での準備（証明書のリネームとスクリプトの設定）
+
+> ここは **手元の PC**（SSH 先の Raspberry Pi ではありません）で、クローンしたリポジトリの `scripts/session-02/` ディレクトリを対象に作業します。
+
+#### 証明書のリネームと配置
+
+先ほどダウンロードした証明書を `scripts/session-02/certs/` に置き、スクリプトが参照する名前にリネームします。まず配置先ディレクトリを作成します。
 
 ```bash
+# PC 側で実行（リポジトリのルートから）
+cd scripts/session-02
+mkdir -p certs
+```
+
+ダウンロードした4ファイルのうち3つを `certs/` に入れ、以下の名前にリネームします（パブリックキーは今回使いません）。
+
+| ダウンロードしたファイル | リネーム後（`certs/` 内） |
+|---|---|
+| `xxxxx-certificate.pem.crt` | `certificate.pem.crt` |
+| `xxxxx-private.pem.key` | `private.pem.key` |
+| `AmazonRootCA1.pem` | `AmazonRootCA1.pem`（変更なし） |
+
+#### shadow_led.py の設定
+
+[scripts/session-02/shadow_led.py](../../scripts/session-02/shadow_led.py) の冒頭の設定値を、AWS 側設定で取得・作成した値に書き換えます。
+
+```python
+ENDPOINT  = "xxxxxx-ats.iot.ap-northeast-1.amazonaws.com"  # 取得した Endpoint に書き換える
+DEVICE_ID = "raspi-001"  # 作成した Thing 名に合わせる（jawsug-<DEVICE_ID>）
+```
+
+> この書き換えは **scp でスクリプトを転送する前に** 済ませておきます（転送後に Raspberry Pi 側で書き換えても構いません）。
+
+### ② Raspberry Pi へ転送（scp）
+
+まず **Raspberry Pi 側（SSH 先のターミナル）** で、転送先ディレクトリを作成します。
+
+```bash
+# Raspberry Pi 側（SSH 接続したターミナル）で実行
+mkdir -p ~/session-02/certs
+```
+
+次に **PC 側**（SSH 先ではなく手元の PC）で、スクリプトと証明書を転送します。
+
+```bash
+# PC 側で実行（raspi.local は Raspberry Pi のホスト名。環境に合わせて変更）
+cd scripts/session-02
+scp shadow_led.py led_ctrl.sh jawsug-user@raspi.local:~/session-02/
+scp certs/* jawsug-user@raspi.local:~/session-02/certs/
+```
+
+> 💡 USB メモリを使う場合も、Raspberry Pi 側が同じ配置（`~/session-02/` にスクリプト、`~/session-02/certs/` に証明書）になるようにコピーしてください。
+
+転送後、Raspberry Pi 側は以下の構成になります。
+
+```
+~/session-02/
+├── shadow_led.py    # Shadow の delta を受信するメインスクリプト
+├── led_ctrl.sh      # ACT LED を制御するシェルスクリプト
+└── certs/
+    ├── certificate.pem.crt
+    ├── private.pem.key
+    └── AmazonRootCA1.pem
+```
+
+### ③ Raspberry Pi 側でのセットアップ
+
+以降は **SSH で接続した Raspberry Pi 側** のターミナルで実行します。まず作業ディレクトリに移動し、ライブラリをインストールします。
+
+```bash
+cd ~/session-02
 python3 -m venv venv
 source venv/bin/activate
 pip install paho-mqtt  # または pip3
 ```
 
-> 💡 最新の Raspberry Pi OS では `pip3 install` 実行時に `error: externally-managed-environment` が発生します。venv を使ってインストールしてください。
+> 💡 最新の Raspberry Pi OS では `pip3 install` 実行時に `error: externally-managed-environment` が発生します。上記のように venv を使ってインストールしてください。
 
-### Raspberry Pi の LED 表現について
-
-今回は基板上の **ACT LED（緑色の LED）** を制御します。GPIO へのハンダ付けや外付け部品は不要です。
-
-ACT LED は通常 SD カードアクセスに連動していますが、`sysfs` 経由でトリガーを解除することで自由に点灯・消灯できます。
-
-```
-LED ON  -> /sys/class/leds/led0/brightness に 1 を書き込む
-LED OFF -> /sys/class/leds/led0/brightness に 0 を書き込む
-```
-
-> `led0` が ACT LED です。操作には `sudo` が必要です。
-
-### 証明書の配置
-
-PC からダウンロードした証明書を Raspberry Pi の `scripts/session-02/certs/` に転送します。
-
-**scp を使う場合：**
+次に LED 制御スクリプトに実行権限を付与し、単体で動作を確認します。
 
 ```bash
-# PC側で実行（raspi.local は Raspberry Pi のホスト名）
-scp certificate.pem.crt private.pem.key AmazonRootCA1.pem \
-  jawsug-user@raspi.local:~/jaws-ug-iot-handson-2026/scripts/session-02/certs/
-```
-
-**USB メモリを使う場合：**
-
-1. PC でダウンロードした証明書を USB メモリにコピー
-2. Raspberry Pi に USB メモリを挿して `scripts/session-02/certs/` にコピー
-
-### ディレクトリ構成
-
-`shadow_led.py` と `led_ctrl.sh` は本リポジトリをクローンすれば `scripts/session-02/` に含まれています。証明書ファイルだけ `certs/` に配置・リネームしてください。
-
-```
-scripts/session-02/
-├── shadow_led.py    # MQTTでShadow deltaを受信するメインスクリプト
-├── led_ctrl.sh      # ACT LEDを制御するシェルスクリプト
-└── certs/
-    ├── certificate.pem.crt   ← xxxxx-certificate.pem.crt をリネーム
-    ├── private.pem.key       ← xxxxx-private.pem.key をリネーム
-    └── AmazonRootCA1.pem     ← そのままでOK
-```
-
-### led_ctrl.sh
-
-まず LED 制御スクリプトに実行権限を付与します（本リポジトリの [scripts/session-02/led_ctrl.sh](../../scripts/session-02/led_ctrl.sh)）。
-
-```bash
-cd scripts/session-02
 chmod +x led_ctrl.sh
-```
-
-スクリプト単体で動作を確認します。
-
-```bash
-./led_ctrl.sh on    # ACT LEDが点灯
-./led_ctrl.sh off   # ACT LEDが消灯
+./led_ctrl.sh on    # ACT LED が点灯
+./led_ctrl.sh off   # ACT LED が消灯
 ```
 
 スクリプト全体は [scripts/session-02/led_ctrl.sh](../../scripts/session-02/led_ctrl.sh) を参照してください。
 
-### shadow_led.py の設定
-
-本リポジトリの [scripts/session-02/shadow_led.py](../../scripts/session-02/shadow_led.py) の冒頭の設定値を、AWS 設定で取得・作成した値に書き換えます。
-
-```python
-ENDPOINT  = "xxxxxx-ats.iot.ap-northeast-1.amazonaws.com"  # 取得したEndpointに書き換える
-DEVICE_ID = "raspi-001"  # 作成したThing名に合わせる（jawsug-<DEVICE_ID>）
-```
-
-スクリプト全体は [scripts/session-02/shadow_led.py](../../scripts/session-02/shadow_led.py) を参照してください。
-
-### 実行
+### ④ 実行
 
 ```bash
-cd scripts/session-02
-source venv/bin/activate
+cd ~/session-02
+# source venv/bin/activate  # まだ venv に入っていない場合
 python3 shadow_led.py
 ```
 
@@ -360,20 +384,21 @@ Waiting for Shadow delta...
 [SUB] Subscribed: $aws/things/jawsug-raspi-001/shadow/update/delta
 ```
 
-この状態でマネジメントコンソールから `desired` を更新すると、`delta` を受信して LED が点灯・消灯します（次の「動作確認」参照）。
+この状態のまま、次の「[動作確認](#動作確認)」の手順に進み、マネジメントコンソールから `desired` を更新すると、`delta` を受信して LED が点灯・消灯します。
 
 `Ctrl+C` で停止できます。
 
 ---
 
-## 動作確認
+## マネジメントコンソールから LED を操作する
 
-### マネジメントコンソールから LED を操作する
+Raspberry Pi 側で `shadow_led.py` を起動したまま、以下を操作します。
 
-1. AWS IoT Core →「管理」→「すべてのデバイス」→「モノ」→ 対象の Thing を選択
-2. 「Device Shadow」タブ →「Classic Shadow」を選択
-3. 「Shadow ドキュメント」の編集ボタンをクリック
-4. 以下の JSON を入力して保存
+1. AWS IoT Core →「管理」→「すべてのデバイス」→「モノ」→ 対象の Thing（`jawsug-raspi-001`）を選択
+2. 「Device Shadow」タブを開く
+   - Classic Shadow がまだ無い場合は「**Device Shadow を作成**」をクリック →「**名前のない (クラシック) シャドウ**」を選択 →「**作成**」をクリック
+3. 一覧から「**Classic Shadow**」を選択
+4. 「Shadow ドキュメント」の「**編集**」をクリックし、以下の JSON を入力して保存
 
 **LED ON：**
 
@@ -383,6 +408,25 @@ Waiting for Shadow delta...
     "desired": { "led": "on" }
   }
 }
+```
+
+保存すると Raspberry Pi 側のターミナルに以下が出力され、ACT LED（緑）が**点灯**します。
+
+```
+[RECV] Delta: {
+  "version": 4,
+  "timestamp": 1783606457,
+  "state": {
+    "led": "on"
+  },
+  "metadata": {
+    "led": {
+      "timestamp": 1783606457
+    }
+  }
+}
+[LED] ON
+[SEND] Reported updated: led=on
 ```
 
 **LED OFF：**
@@ -395,7 +439,24 @@ Waiting for Shadow delta...
 }
 ```
 
-5. Raspberry Pi の ACT LED が点灯・消灯することを確認
+保存すると同様に以下が出力され、ACT LED が**消灯**します。
+
+```
+[RECV] Delta: {
+  "version": 6,
+  "timestamp": 1783606473,
+  "state": {
+    "led": "off"
+  },
+  "metadata": {
+    "led": {
+      "timestamp": 1783606473
+    }
+  }
+}
+[LED] OFF
+[SEND] Reported updated: led=off
+```
 
 ### 確認ポイント
 
