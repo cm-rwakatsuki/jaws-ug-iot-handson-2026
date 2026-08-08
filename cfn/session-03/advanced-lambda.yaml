@@ -1,0 +1,208 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  JAWS-UG IoT Handson Session 3 (Advanced A) - IoT Rules Engine to Lambda.
+  Creates IoT Rule that invokes Lambda to log metrics to CloudWatch Logs.
+
+# ------------------------------------------------------------
+# パラメータ
+# ------------------------------------------------------------
+Parameters:
+  DeviceNumber:
+    Type: String
+    Default: "001"
+    AllowedPattern: "^[0-9]{3}$"
+    ConstraintDescription: "3桁の数字を入力してください（例: 001）"
+    Description: "デバイス番号（3桁数字）"
+
+# ------------------------------------------------------------
+# リソース
+# ------------------------------------------------------------
+Resources:
+
+  # Lambda ロググループ（保持 3 日、関数より先に作成）
+  MetricsLoggerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/jawsug-s3-metrics-logger-raspi-${DeviceNumber}"
+      RetentionInDays: 3
+
+  # Lambda 実行ロール（ログ書き込みのみ）
+  MetricsLoggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "jawsug-s3-lambda-role-raspi-${DeviceNumber}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchLogsWrite
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "${MetricsLoggerLogGroup.Arn}:*"
+
+  # Lambda 関数（インラインコード、D-10）
+  MetricsLoggerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "jawsug-s3-metrics-logger-raspi-${DeviceNumber}"
+      Runtime: python3.13
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 10
+      Role: !GetAtt MetricsLoggerRole.Arn
+      Code:
+        ZipFile: |
+          import json
+
+
+          REQUIRED_FIELDS = ["deviceId", "cpu", "memory", "timestamp"]
+
+
+          def normalize_record(event: dict) -> dict:
+              """イベントから必要なフィールドを抽出し、欠落は None を入れる。"""
+              return {
+                  "deviceId": event.get("deviceId"),
+                  "cpu": event.get("cpu"),
+                  "memory": event.get("memory"),
+                  "timestamp": event.get("timestamp"),
+                  "topic": event.get("topic"),
+                  "receivedAtMs": event.get("receivedAtMs"),
+              }
+
+
+          def has_required_fields(record: dict) -> bool:
+              """必須フィールドが揃っているか判定する。"""
+              for field in REQUIRED_FIELDS:
+                  if record.get(field) is None:
+                      return False
+              return True
+
+
+          def handler(event, context):
+              """構造化ログ（JSON 1 行）を出力する。欠落時は level=WARN で継続（R4-4）。"""
+              try:
+                  record = normalize_record(event)
+
+                  if has_required_fields(record):
+                      log_entry = {
+                          "level": "INFO",
+                          "event": "metrics_received",
+                          "deviceId": record["deviceId"],
+                          "cpu": record["cpu"],
+                          "memory": record["memory"],
+                          "timestamp": record["timestamp"],
+                      }
+                      if record.get("topic"):
+                          log_entry["topic"] = record["topic"]
+                  else:
+                      missing = [f for f in REQUIRED_FIELDS if record.get(f) is None]
+                      log_entry = {
+                          "level": "WARN",
+                          "event": "metrics_incomplete",
+                          "message": f"Missing required fields: {missing}",
+                          "receivedEvent": event,
+                      }
+
+                  print(json.dumps(log_entry, ensure_ascii=False))
+                  return {"statusCode": 200, "body": log_entry}
+
+              except Exception as e:
+                  error_entry = {
+                      "level": "ERROR",
+                      "event": "handler_exception",
+                      "error": str(e),
+                      "errorType": type(e).__name__,
+                  }
+                  print(json.dumps(error_entry, ensure_ascii=False))
+                  raise
+    DependsOn: MetricsLoggerLogGroup
+
+  # IoT ルール（Lambda アクション）
+  MetricsToLambdaRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: !Sub "jawsug_s3_metrics_to_lambda_raspi_${DeviceNumber}"
+      TopicRulePayload:
+        AwsIotSqlVersion: "2016-03-23"
+        RuleDisabled: false
+        Sql: "SELECT deviceId, cpu, memory, timestamp, topic() AS topic, timestamp() AS receivedAtMs FROM 'jawsug/session-03/+/metrics'"
+        Actions:
+          - Lambda:
+              FunctionArn: !GetAtt MetricsLoggerFunction.Arn
+        ErrorAction:
+          CloudwatchLogs:
+            RoleArn: !GetAtt LambdaRuleErrorRole.Arn
+            LogGroupName: !Ref LambdaRuleErrorLogGroup
+
+  # Lambda へのリソースベースポリシー（IoT Rules からの呼び出しを許可）
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MetricsLoggerFunction
+      Action: lambda:InvokeFunction
+      Principal: iot.amazonaws.com
+      SourceArn: !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:rule/jawsug_s3_metrics_to_lambda_raspi_${DeviceNumber}"
+
+  # ルールエラー用ロググループ
+  LambdaRuleErrorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/iot/session-03/lambda-rule-errors-raspi-${DeviceNumber}"
+      RetentionInDays: 3
+
+  # ルールエラー用 IAM ロール
+  LambdaRuleErrorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "jawsug-s3-lambda-rule-error-role-raspi-${DeviceNumber}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: iot.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchLogsWrite
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: !Sub "${LambdaRuleErrorLogGroup.Arn}:*"
+
+# ------------------------------------------------------------
+# 出力
+# ------------------------------------------------------------
+Outputs:
+  LambdaFunctionName:
+    Description: "Lambda function name"
+    Value: !Ref MetricsLoggerFunction
+
+  LambdaLogGroupName:
+    Description: "Lambda CloudWatch Logs group"
+    Value: !Ref MetricsLoggerLogGroup
+
+  LambdaRuleName:
+    Description: "IoT Rule name (Lambda)"
+    Value: !Sub "jawsug_s3_metrics_to_lambda_raspi_${DeviceNumber}"
+
+  LogsInsightsQuery:
+    Description: "Sample Logs Insights query"
+    Value: >
+      fields @timestamp, deviceId, cpu, memory
+      | filter event = "metrics_received"
+      | sort @timestamp desc
+      | limit 20

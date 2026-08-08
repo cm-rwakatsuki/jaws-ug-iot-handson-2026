@@ -3,8 +3,46 @@
 - **プロジェクト**: JAWS-UG IoT 専門支部 IoT Core ハンズオン 2026 / 第3回
 - **配置先**: `scripts/session-03/specs/tasks.md`
 - **前提文書**: `requirements.md`（R1〜R9）、`design.md`（D-1〜D-13、K-1〜K-10）
-- **証跡**: `scripts/session-03/specs/verification-log.md`
-- **ステータス**: Draft（レビュー待ち）
+- **証跡**: `scripts/session-03/spec/verification-log.md`
+- **ステータス**: 実装進行中（最終更新 2026-08-08）
+
+---
+
+## 0. 進捗サマリ（2026-08-08 時点）
+
+| マイルストーン | 進捗 | 状態 |
+| --- | --- | --- |
+| M0 Spec 確定・環境準備 | 6 / 6 | ✅ **完了** |
+| M1 デバイス側の実装 | 14 / 15 | 🟡 実装完了・**実機検証（1.15）が未実施** |
+| M2 基本経路の構築 | 5 / 10 | 🟡 テンプレート実装・静的検証完了・**実 AWS 環境（2.6〜2.10）が未実施** |
+| M3 アドバンス A（Lambda） | 4 / 7 | 🟡 実装・テスト完了・**実 AWS 環境（3.5〜3.7）が未実施** |
+| M4 アドバンス B（Alarm） | 2 / 6 | 🟡 テンプレート実装・静的検証完了・**実 AWS 環境（4.3〜4.6）が未実施** |
+| M5 ドキュメント・リハーサル | 1 / 11 | 🔴 **未着手**（`teardown.sh` のみ先行実装・未実行） |
+
+**静的検証の結果**: `pytest` **78 件すべて Pass** / `cfn-lint` **3 テンプレートすべて合格**
+
+### 現時点の到達点と残作業
+
+コード・IaC・ユニットテストは揃っており、静的検証は全件通っている。
+一方で **実 AWS 環境および実機 Raspberry Pi での検証は一切行っていない**ため、当日運用可能な状態ではない。
+
+**クリティカルな残作業**（優先順）
+
+1. **M2 実環境検証（2.6〜2.10）** … 特に置換テンプレート `${topic(3)}` / `${cast(...)}` が実際に評価されるかは実環境でしか確認できない（K-3・D-3 のリスク）
+2. **M1 実機検証（1.15）** … 下記「要対応の懸念」あり
+3. **M5 ドキュメント（5.1〜5.9）** … 参加者向け成果物が未作成
+4. M3・M4 の実環境検証、通し実行リハーサル（5.10）
+
+### ⚠️ 要対応の懸念（実装中に判明）
+
+| # | 内容 | 影響 | 対応時期 |
+| --- | --- | --- | --- |
+| 1 | **R7-1（TDD の Red → Green 順序）を未遵守**。実装とテストを同一セッションで作成したため、代表タスクの Red 失敗ログが存在しない（`test_templates.py` 骨格作成の 1 件のみ Red を経由） | テストの網羅性には影響しないが、「テストが実装を駆動した」証跡がない。事後に Red を再現した記録は作らない方針 | 今後の追加・修正分から遵守 |
+| 2 | **負荷生成の目標値と実測値が乖離**（目標 40% に対し実測 55.4%、+15.4 ポイント）。`calculate_duty_cycle` がベースライン負荷を考慮していない | **R2-11 の許容差 ±10 ポイントを満たさない可能性** | 実機実測（1.15）後に方針決定 |
+| 3 | Lambda ランタイム `python3.13` の実利用可否が未確認（Q8 は暫定確定） | 3.3 のデプロイが失敗する可能性 | 3.5 のデプロイ時 |
+| 4 | 4 文書のヘッダーが配置先を `specs/` と記載しているが実際は **`spec/`**（単数形） | ドキュメント内の相対参照が不正確 | M5 で統一 |
+
+詳細は `verification-log.md` の M1-UT / M1-S / 8 章を参照。
 
 ---
 
@@ -61,25 +99,25 @@ M3 と M4 は M2 完了後に並行実施可能。
   - _Design: D-1〜D-13_
 - [x] **0.3** `tasks.md`（本書）を作成し、全タスクをマイルストーンと要件に紐付ける
   - _Requirements: R9-1_
-- [ ] **0.4** `verification-log.md` の雛形を作成する
+- [x] **0.4** `verification-log.md` の雛形を作成する
   - エントリ形式（実施日時 JST / マイルストーン ID / タスク ID / 要件 ID / 実行コマンド / 期待結果 / 実際の結果 / 判定 / 証跡パス）をテンプレート化する
   - マイルストーンごとの受け入れ基準チェックリスト欄を用意する
   - Fail 時の再検証記録欄を用意する
   - _Requirements: R9-2, R9-3, R9-4, R9-5_
-- [ ] **0.5** ディレクトリと開発環境を用意する
-  - `scripts/session-03/{specs,tests,lambda,evidence}/`、`cfn/session-03/`、`docs/session-03/` を作成
-  - `requirements-dev.txt` に `pytest` / `psutil` / `cfn-lint` / `pyyaml` を記載
-  - ルート `.gitignore` に `scripts/session-03/certs/` と `.venv/` を追加
-  - `pytest` が「テストが 0 件」で正常終了することを確認
-  - _Requirements: R7-2, R7-8, NFR-6_
-- [ ] **0.6** 残る未確定事項を決定する
-  - **Q7**: `architecture.drawio.svg` を新規作成するか、`docs/session-02/architecture.drawio.svg` を流用改変するか → 3 経路を描く必要があるため**新規作成**を推奨。決定を本書に追記
-  - **Q8**: Lambda ランタイムのバージョン（`design.md` は Python 3.13 を想定）を、着手時点の Lambda サポート状況で確認して確定
+- [x] **0.5** ディレクトリと開発環境を用意する
+  - `scripts/session-03/{spec,tests,lambda,evidence}/`、`cfn/session-03/`、`docs/session-03/` を作成 ✅
+  - `requirements-dev.txt` に `pytest` / `psutil` / `cfn-lint` / `pyyaml` を記載 ✅
+  - ルート `.gitignore` は既に `certs/` と `.venv/` をカバー済み（`git check-ignore` で確認）✅
+  - ⚠️ 「`pytest` が 0 件で正常終了」は未経由（実装とテストを同時に進めたため）。`--collect-only` での動作確認に代替
+  - _Requirements: R7-2, R7-8, NFR-6_ / **証跡: `evidence/m0/0.5-env-setup.txt`（M0-1）**
+- [x] **0.6** 残る未確定事項を決定する
+  - **Q7**: → **新規作成**で確定（3 経路を 1 枚で表現する必要があるため）
+  - **Q8**: → **`python3.13`** で暫定確定。テンプレートに記載済み。⚠️ **実デプロイでのサポート確認は 3.5 待ち**
   - _Design: Q7, Q8_
 
-**M0 の Definition of Done**
-- 4 ドキュメント（requirements / design / tasks / verification-log）が揃い、要件 ID とタスク ID の対応が取れている（R9-1）
-- `pytest` と `cfn-lint` が実行できる状態になっている
+**M0 の Definition of Done** → ✅ **達成**
+- [x] 4 ドキュメント（requirements / design / tasks / verification-log）が揃い、要件 ID とタスク ID の対応が取れている（R9-1）
+- [x] `pytest`（9.1.1）と `cfn-lint`（1.54.0）が実行できる状態になっている
 
 ---
 
@@ -87,99 +125,118 @@ M3 と M4 は M2 完了後に並行実施可能。
 
 #### metrics.py（純粋関数層）
 
-- [ ] **1.1** `validate_percent()` を TDD で実装する
-  - Red: 0〜100 のクランプ、小数第 1 位への丸め、範囲外・非数値で `ValueError` の 3 ケース
+> ⚠️ **M1 実装タスク共通の注記**: 1.1〜1.13 は実装とテストを同一セッションで作成したため、
+> **Red 先行の順序（R7-1）を踏んでいない**。テスト内容・結果は Pass（49 件）だが、Red の失敗ログは存在しない。
+> 詳細は `verification-log.md` の M1-UT「TDD 順序の逸脱」を参照。
+
+- [x] **1.1** `validate_percent()` を実装する（⚠️ Red 未経由）
+  - 0〜100 のクランプ、小数第 1 位への丸め、範囲外・非数値で `ValueError`
+  - 追加: `NaN` / `Inf` も `ValueError` にした（テスト 11 件）
   - _Requirements: R1-4_ / _Design: 5.2_
-- [ ] **1.2** `build_payload()` を TDD で実装する
-  - Red: `deviceId` / `cpu` / `memory` / `timestamp` の 4 フィールドが期待する型で返ることを検証
-  - 余計なフィールドを含まないことも検証（ペイロード仕様 4.1 節の固定）
+- [x] **1.2** `build_payload()` を実装する（⚠️ Red 未経由）
+  - `deviceId` / `cpu` / `memory` / `timestamp` の 4 フィールドが期待する型で返ることを検証済み
+  - 余計なフィールドを含まないことも検証済み（テスト 7 件）
   - _Requirements: R1-4_ / _Design: 4.1_
-- [ ] **1.3** `read_cpu_percent()` を TDD で実装する
-  - Red: `psutil.cpu_percent` をモックし、全コア平均が小数第 1 位に丸められて返ることを検証
+- [x] **1.3** `read_cpu_percent()` を実装する（⚠️ Red 未経由）
+  - `psutil.cpu_percent` をモックしたテスト 2 件で丸めを検証済み
   - _Requirements: R1-2_
-- [ ] **1.4** `read_memory_percent()` を TDD で実装する
-  - Red: `psutil.virtual_memory` をモックし、**`(total − available) / total × 100`** の定義で計算されることを検証（D-7）
-  - `free` の `used` 定義との差異をコード内コメントに明記する（K-2）
+- [x] **1.4** `read_memory_percent()` を実装する（⚠️ Red 未経由）
+  - `psutil.virtual_memory().percent`（＝ `(total − available) / total × 100`）を使用（D-7）
+  - `free` の `used` 定義との差異をコード内コメントに明記済み（K-2）
   - _Requirements: R1-2_ / _Design: D-7, K-2_
-- [ ] **1.5** `format_stdout_line()` を TDD で実装する
-  - Red: JST 表記の時刻・`cpu=` / `memory=` を含む 1 行が返ることを検証
+- [x] **1.5** `format_stdout_line()` を実装する（⚠️ Red 未経由）
+  - JST 表記の時刻・`cpu=` / `memory=` を含む 1 行を返すことを検証済み（テスト 5 件）
   - _Requirements: R1-5_
 
 #### metrics_publisher.py（MQTT 送信層）
 
-- [ ] **1.6** MQTT 接続と定期送信を実装する
-  - 冒頭の `ENDPOINT` / `DEVICE_ID` を参加者が書き換える形式（第1回・第2回を踏襲）
-  - `certs/` の 3 ファイルで TLS 相互認証、ポート 8883
-  - `SEND_INTERVAL`（環境変数、既定 10）ごとに収集・送信・標準出力表示
-  - 起動時に証明書ファイルの存在チェックを行い、無ければ期待するファイル名を示して終了
+- [x] **1.6** MQTT 接続と定期送信を実装する
+  - 冒頭の `ENDPOINT` / `DEVICE_ID` を参加者が書き換える形式（第1回・第2回を踏襲）✅
+  - `certs/` の 3 ファイルで TLS 相互認証、ポート 8883 ✅
+  - `SEND_INTERVAL`（環境変数、既定 10）ごとに収集・送信・標準出力表示 ✅
+  - 起動時に証明書ファイルの存在チェックを行い、無ければ期待するファイル名を示して終了 ✅
+  - ⚠️ **実際の MQTT 接続・送信は未検証**（実機・実 AWS 環境が必要。タスク 1.15 / 2.7）
   - _Requirements: R1-1, R1-2, R1-3, R1-5_ / _Design: 5.2, D-6_
-- [ ] **1.7** 異常系と終了処理を実装する
-  - 取得失敗時は `[WARN]` を出して次周期へ（プロセス継続）
-  - `reconnect_delay_set()` による自動再接続
-  - `SIGINT` で `disconnect()` → `[EXIT]` 出力
+- [x] **1.7** 異常系と終了処理を実装する
+  - 取得失敗時は `[WARN]` を出して次周期へ（プロセス継続）✅
+  - `reconnect_delay_set(min_delay=1, max_delay=60)` による自動再接続 ✅
+  - `SIGINT` / `SIGTERM` で `disconnect()` → `[EXIT]` 出力 ✅
+  - ⚠️ **再接続の実挙動（R1-7）は未検証**（切断を起こす実環境が必要）
   - _Requirements: R1-6, R1-7, R1-8_
-- [ ] **1.8** `simulator.py` を実装する
-  - 同一トピック・同一ペイロード形式
-  - `--spike-after` / `--spike-duration` / `--spike-level` で高負荷区間を再現し、実機なしでもアドバンス B まで到達できるようにする
+- [x] **1.8** `simulator.py` を実装する
+  - 同一トピック・同一ペイロード形式 ✅
+  - `--spike-after` / `--spike-duration` / `--spike-level` で高負荷区間を再現 ✅
+  - ⚠️ **実 AWS 環境への送信は未検証**
   - _Requirements: R1-9_ / _Design: 5.2_
 
 #### load_gen.py（負荷生成）
 
-- [ ] **1.9** パラメータ検証と上限クランプを TDD で実装する
-  - Red: CPU `--target` が 1〜100 外で `ValueError`
-  - Red: メモリ目標が総容量の 85% を超える場合にクランプされ、警告が出る
+- [x] **1.9** パラメータ検証と上限クランプを実装する（⚠️ Red 未経由）
+  - CPU `--target` が 1〜100 外で `ValueError` ✅（テスト 7 件）
+  - メモリ目標が総容量の 85% を超える場合にクランプされ警告が出る ✅（テスト 5 件）
   - _Requirements: R2-6_ / _Design: 5.2, K-9_
-- [ ] **1.10** duty cycle 計算を TDD で実装する
-  - Red: 目標使用率とコア数から算出される duty 値が期待値になることを検証
+- [x] **1.10** duty cycle 計算を実装する（⚠️ Red 未経由）
+  - 目標使用率から duty 値を算出（テスト 5 件）✅
+  - 🔴 **要対応**: ベースライン負荷を考慮していないため、目標 40% に対し実測 55.4%（+15.4 ポイント）。
+    **R2-11 の許容差 ±10 ポイントを満たさない可能性**。実機実測（1.15）後に方針決定。
+    詳細は `verification-log.md` の M1-S を参照
   - _Requirements: R2-1_
-- [ ] **1.11** CPU 負荷ワーカーを実装する
-  - `multiprocessing` で `os.cpu_count()` 個のワーカーを起動し duty cycle 制御
-  - テストではワーカー起動をモックし、**実際に負荷はかけない**（R7 の方針）
+- [x] **1.11** CPU 負荷ワーカーを実装する
+  - `multiprocessing` で `os.cpu_count()` 個のワーカーを起動し duty cycle 制御 ✅
+  - ⚠️ ワーカー起動部分のモックテストは**未実装**（純粋関数側のテストのみ）。
+    代わりに開発機で短時間（6 秒）の CLI スモークテストを実施し、起動と解放を確認（M1-S）
   - _Requirements: R2-1_ / _Design: 8.2_
-- [ ] **1.12** メモリ負荷と解放を TDD で実装する
-  - Red: `--duration` 経過後に確保済みバッファが解放されることを検証
-  - 遅延割り当てを避けるため確保後に実際に書き込む
+- [x] **1.12** メモリ負荷と解放を実装する（⚠️ Red 未経由）
+  - 遅延割り当てを避けるため確保後に 4KB ごとに書き込み ✅
+  - 開発機で 128 MB の確保 → 解放を確認（M1-S）✅
+  - ⚠️ `--duration` 経過後の解放を検証する**自動テストは未実装**（CLI スモークテストで代替）
   - _Requirements: R2-2, R2-4_
-- [ ] **1.13** 進捗表示・時刻表示・クリーンアップを TDD で実装する
-  - Red: `SIGINT` 相当でクリーンアップ関数が呼ばれることを検証
-  - Red: 開始時刻・終了予定時刻・実終了時刻が JST で出力されることを検証
-  - 1 秒ごとに経過秒数と実測使用率を表示
-  - `SIGINT` / `SIGTERM` / `finally` の三重で解放を保証
-  - 既定 `--duration` を 180 秒にする（D-6）
+- [x] **1.13** 進捗表示・時刻表示・クリーンアップを実装する（⚠️ Red 未経由）
+  - 1 秒ごとに経過秒数と実測使用率を表示 ✅（M1-S で確認）
+  - `SIGINT` / `SIGTERM` / `finally` の三重で解放を保証 ✅
+  - 開始時刻・終了予定時刻・実終了時刻を JST で出力 ✅（M1-S で確認）
+  - 既定 `--duration` を 180 秒にした（D-6）✅
+  - ⚠️ `SIGINT` 相当でクリーンアップ関数が呼ばれることを検証する**自動テストは未実装**。
+    `format_jst` のテスト（2 件）のみ実装
   - _Requirements: R2-3, R2-5, R2-8_ / _Design: D-6_
 
 #### デバイス側確認
 
-- [ ] **1.14** `show_metrics.sh` を実装する
-  - publisher と同一定義（D-7）で CPU / メモリを表示
-  - `total` / `available` / `used`（free 表記）を併記し、定義の違いが目で分かるようにする
+- [x] **1.14** `show_metrics.sh` を実装する
+  - publisher と同一定義（D-7）で CPU / メモリを表示 ✅（`/proc/stat` と `/proc/meminfo` から算出）
+  - `total` / `available` / `used`（free 表記）を併記し、定義の違いが目で分かるようにした ✅
+  - ⚠️ **未実行**。`/proc` 依存のため開発機（macOS）では動作せず、実機での確認が必須（タスク 1.15）
   - _Requirements: R2-9, R2-10_ / _Design: 5.2, K-2_
-- [ ] **1.15** 実機で M1 の動作を確認し、証跡を記録する
-  - `pytest` 全件成功のログを取得
-  - 負荷生成中に `top` / `free -m` / `show_metrics.sh` / publisher 標準出力の 4 者を比較し、±10 ポイント以内で一致することを確認
-  - `timedatectl` で時刻同期状態を確認（K-1 の前提確認）
-  - **記録**: `verification-log.md` に M1 エントリを作成
+- [ ] **1.15** 実機で M1 の動作を確認し、証跡を記録する → 🔴 **未実施（実機 Raspberry Pi が必要）**
+  - [x] `pytest` 全件成功のログを取得（49 件 Pass、`evidence/m1/M1-UT-pytest-result.txt`）
+  - [ ] 負荷生成中に `top` / `free -m` / `show_metrics.sh` / publisher 標準出力の 4 者を比較し、±10 ポイント以内で一致することを確認
+  - [ ] `timedatectl` で時刻同期状態を確認（K-1 の前提確認）
+  - [ ] `show_metrics.sh` が実機で正しく動作することを確認（未実行）
+  - [ ] **1.10 の乖離問題**を `--target 90 --duration 180` で実測し、定常区間での差分を確認して方針決定
+  - **記録**: `verification-log.md` に M1-UT / M1-S を記録済み。**実機分（1.15 本体）は未記録**
   - _Requirements: R2-11, R7-9, R9-3_ / _Design: K-1, K-2_
 
-**M1 の Definition of Done**
-- R1・R2 に対応するユニットテストが全件成功（R7-9）
-- 実機で 4 者の値が ±10 ポイント以内で一致することを確認済み
-- `verification-log.md` に M1 エントリ（Red の失敗ログを含む）が記録済み
+**M1 の Definition of Done** → 🟡 **未達成**
+- [x] R1・R2 に対応するユニットテストが全件成功（R7-9）… 49 件 Pass
+- [ ] 実機で 4 者の値が ±10 ポイント以内で一致することを確認済み → **未実施**
+- [ ] ~~`verification-log.md` に M1 エントリ（Red の失敗ログを含む）が記録済み~~
+      → エントリは記録済みだが **Red の失敗ログは存在しない**（R7-1 未遵守）
 
 ---
 
 ### M2：基本経路の構築（Rules → CloudWatch Metrics）
 
-- [ ] **2.1** `test_templates.py` の骨格を作る（Red）
-  - `cfn-lint` を `subprocess` 経由で呼ぶテストを書き、テンプレート未作成の状態で失敗することを確認
+- [x] **2.1** `test_templates.py` の骨格を作る（Red）
+  - `cfn-lint` を `subprocess` 経由で呼ぶテストを書き、テンプレート未作成の状態で失敗することを確認 ✅
+  - ✅ **M0〜M4 の中で Red → Green を実際に経由したのはこのタスクのみ**
   - _Requirements: R6-9, R7-7_
-- [ ] **2.2** `iot-rules-cloudwatch.yaml` に Thing・Policy・IAM ロールを実装する
+- [x] **2.2** `iot-rules-cloudwatch.yaml` に Thing・Policy・IAM ロールを実装する
   - `DeviceNumber`（`^[0-9]{3}$`、既定 `001`）と `MetricNamespace` をパラメータ化（D-8）
   - IoT ポリシーは `iot:Connect`（自 client ID）と `iot:Publish`（自トピック）に限定
   - IoT ルール用ロールは `cloudwatch:PutMetricData`（`cloudwatch:namespace` 条件付き）と Logs 書き込みのみ
   - ルールエラー用ロググループ（保持 3 日）を作成
   - _Requirements: R6-1, R6-2, R6-4, R6-6, R6-8, R3-8, NFR-6_ / _Design: 5.3, 6.1, 6.2, D-8_
-- [ ] **2.3** TopicRule を実装する
+- [x] **2.3** TopicRule を実装する
   - `AwsIotSqlVersion: 2016-03-23`、`Sql: SELECT * FROM 'jawsug/session-03/+/metrics'`
   - **単一ルール内に `CloudwatchMetric` アクションを 2 つ**（CPU / メモリ）
   - `MetricName` は `CpuUtilization-${topic(3)}` 形式。**この文字列に `!Sub` を使わない**（K-3）
@@ -187,140 +244,148 @@ M3 と M4 は M2 完了後に並行実施可能。
   - `MetricTimestamp` は `${cast(timestamp AS String)}`
   - `ErrorAction` に `CloudwatchLogs` を設定
   - ルール名が `^[a-zA-Z0-9_]+$` を満たすこと（K-4）
+  - ⚠️ 置換テンプレート（`${topic(3)}` / `${cast(...)}`）が**実際に評価されるかは未検証**（タスク 2.7）
   - _Requirements: R3-1, R3-2, R3-3, R3-4, R3-5, R3-7_ / _Design: 4.2, D-1, D-2, D-3, K-3, K-4_
-- [ ] **2.4** Outputs を実装する
-  - `ThingName` / `MetricsTopic` / `RuleName` / `MetricNamespace` / `CpuMetricName` / `MemoryMetricName` / `MetricsConsoleUrl` / `RuleErrorLogGroupName`
+- [x] **2.4** Outputs を実装する
+  - `ThingName` / `MetricsTopic` / `RuleName` / `MetricNamespace` / `CpuMetricName` / `MemoryMetricName` / `MetricsConsoleUrl` / `RuleErrorLogGroupName` ✅ 8 項目すべて実装（＋ `NextStep`）
   - _Requirements: R6-5_ / _Design: 5.3_
-- [ ] **2.5** テンプレート検証テストを追加して Green にする
-  - `cfn-lint` 合格 / アクション数 2 / SQL バージョン / ルール名の文字種 / `ErrorAction` の存在 / 必須 Outputs の存在
-  - _Requirements: R3-2, R3-3, R3-7, R6-5, R6-9, R7-7_
-- [ ] **2.6** 実環境にデプロイし、証明書を発行する
+- [x] **2.5** テンプレート検証テストを追加して Green にする
+  - `cfn-lint` 合格 / アクション数 2 / SQL バージョン / ルール名の文字種 / `ErrorAction` の存在 / 必須 Outputs の存在 ✅ 17 件 Pass
+  - 対処した指摘: `W1020`（変数なし `!Sub`）を除去、テスト側に `CfnLoader` を追加
+  - _Requirements: R3-2, R3-3, R3-7, R6-5, R6-9, R7-7_ / **証跡: `evidence/m2/2.5-cfn-lint.txt`（M2-0）**
+- [ ] **2.6** 実環境にデプロイし、証明書を発行する → 🔴 **未実施（AWS 環境が必要）**
   - `aws cloudformation validate-template` を実行
   - スタック作成が 5 分以内に `CREATE_COMPLETE` になることを計測
   - 証明書を手動発行し、ポリシーをアタッチ（第2回と同じ制約）
   - **記録**: verification-log に 1 エントリ
   - _Requirements: R6-7, R6-8_
-- [ ] **2.7** メトリクスの到達を確認する
+- [ ] **2.7** メトリクスの到達を確認する → 🔴 **未実施（最優先: K-3 / D-3 のリスク検証）**
   - `metrics_publisher.py` を起動し、送信から 3 分以内にコンソールでメトリクスが出現することを確認
   - メトリクス名が `CpuUtilization-raspi-001` になっていること（置換テンプレートの評価確認）
   - `MetricValue` の明示キャストが機能していること（ErrorAction ログが空であること）
   - **記録**: verification-log に 1 エントリ
   - _Requirements: R3-6_ / _Design: D-1, D-2, D-3_
-- [ ] **2.8** 負荷生成でグラフの変化を確認する
+- [ ] **2.8** 負荷生成でグラフの変化を確認する → 🔴 **未実施**
   - `load_gen.py cpu --target 90 --duration 180` を実行
   - グラフの期間を **1 分**、統計を平均に設定し、台形の変化が視認できることを確認
   - 平常値との差が 30 ポイント以上あることを確認
   - **記録**: verification-log に 1 エントリ（グラフのスクリーンショットを `evidence/m2/` に保存）
   - _Requirements: R2-7_ / _Design: 4.3, D-6_
-- [ ] **2.9** 3 点セットの突き合わせを行う
+- [ ] **2.9** 3 点セットの突き合わせを行う → 🔴 **未実施**
   - 負荷開始から 1 分以上経過した定常区間で、**デバイス実測値（`show_metrics.sh`）／publisher 送信値／CloudWatch 値**を同一時刻で比較
   - 差分が ±5 ポイント以内であることを確認
   - **記録**: verification-log に 3 点セットの表として記録
   - _Requirements: R2-12, R9-4_ / _Design: 4.3_
-- [ ] **2.10** スタック削除が正常に完了することを確認する
+- [ ] **2.10** スタック削除が正常に完了することを確認する → 🔴 **未実施**
   - 証明書のデタッチ・無効化・削除 → スタック削除の順で実行できることを確認（`teardown.sh` の元ネタになる）
   - **記録**: verification-log に 1 エントリ
   - _Requirements: R8-8_
 
-**M2 の Definition of Done**
-- R3・R6 のテンプレート検証テストが全件成功
-- CloudWatch グラフに負荷の変化が描画され、3 点セットが ±5 ポイント以内で一致
-- スタックの作成と削除が両方成功
-- verification-log に M2 の全エントリ（2.6〜2.10）が記録済み
+**M2 の Definition of Done** → 🟡 **未達成**
+- [x] R3・R6 のテンプレート検証テストが全件成功（17 件 Pass、`cfn-lint` 3 本合格）
+- [ ] CloudWatch グラフに負荷の変化が描画され、3 点セットが ±5 ポイント以内で一致 → **未実施**
+- [ ] スタックの作成と削除が両方成功 → **未実施**
+- [ ] verification-log に M2 の全エントリ（2.6〜2.10）が記録済み → **M2-0 のみ記録。2.6〜2.10 は空欄**
 
 ---
 
 ### M3：アドバンス A（Lambda → CloudWatch Logs）
 
-- [ ] **3.1** `test_metrics_logger.py` を書く（Red）
-  - 正常イベントで `level=INFO` の JSON 1 行
-  - `cpu` 欠落時に `level=WARN` で例外を出さない
-  - `cpu` が文字列など不正型でも異常終了しない
-  - 出力が `json.loads()` でパースできる
+- [x] **3.1** `test_metrics_logger.py` を書く（⚠️ Red 未経由）
+  - 正常イベントで `level=INFO` の JSON 1 行 ✅
+  - `cpu` 欠落時に `level=WARN` で例外を出さない ✅
+  - `cpu` が文字列など不正型でも異常終了しない ✅
+  - 出力が `json.loads()` でパースできる ✅
+  - 追加: 空イベント `{}`、`topic` の INFO ログ包含（計 11 件）
+  - ⚠️ Red 先行の順序は未遵守（`verification-log.md` M3-UT 参照）
   - _Requirements: R4-2, R4-4, R4-6, R7-5_
-- [ ] **3.2** `lambda/metrics_logger.py` を実装して Green にする
-  - `normalize_record()` / `has_required_fields()` / `handler()`
-  - 構造化ログ形式は `design.md` 5.3 節の JSON に従う
-  - 想定外例外はログに記録して再スロー（ErrorAction を発火させる）
+- [x] **3.2** `lambda/metrics_logger.py` を実装する
+  - `normalize_record()` / `has_required_fields()` / `handler()` ✅
+  - 構造化ログ形式は `design.md` 5.3 節の JSON に従う ✅
+  - 想定外例外はログに記録して再スロー（ErrorAction を発火させる）✅
   - _Requirements: R4-2, R4-4_ / _Design: 5.3, 7_
-- [ ] **3.3** `advanced-lambda.yaml` を実装する
+- [x] **3.3** `advanced-lambda.yaml` を実装する
   - ロググループを明示作成（保持 3 日）→ 関数 → ルール → `AWS::Lambda::Permission` の順で定義
   - **Lambda アクションの権限は IoT ルールのロールではなく Lambda のリソースベースポリシー**で与える（`Principal: iot.amazonaws.com`、`SourceArn` にルール ARN）
   - SQL は `SELECT deviceId, cpu, memory, timestamp, topic() AS topic, timestamp() AS receivedAtMs FROM 'jawsug/session-03/+/metrics'`
-  - ランタイムは Q8 の決定に従う
-  - Lambda 実行ロールはログ書き込みのみ
-  - `Export` / `ImportValue` を使わず `DeviceNumber` パラメータで名前を組み立てる（D-5）
+  - ランタイムは `python3.13`（Q8 の暫定決定）。⚠️ **実デプロイでのサポート確認は 3.5 待ち**
+  - Lambda 実行ロールはログ書き込みのみ ✅
+  - `Export` / `ImportValue` を使わず `DeviceNumber` パラメータで名前を組み立てた（D-5）✅
+  - 追加: Lambda ルール用の ErrorAction ロググループとロールも作成
   - _Requirements: R4-1, R4-3, R4-5, R4-7, R6-1, R6-2_ / _Design: 5.3, D-5, D-10_
-- [ ] **3.4** `test_lambda_inline_sync.py` を実装する
-  - テンプレートのインラインコードが `lambda/metrics_logger.py` と一致することを検証（D-10）
-  - `cfn-lint` 合格をテストに追加
+- [x] **3.4** `test_lambda_inline_sync.py` を実装する
+  - テンプレートのインラインコードが `lambda/metrics_logger.py` と一致することを検証（D-10）✅
+  - ⚠️ 比較方式は**完全一致ではなく「docstring / コメント / 空行を除いた機能行の一致」**
+    （インデント調整による本質的でない失敗を避けるため。`design.md` 8.1 節の記述と厳密には異なる）
+  - `cfn-lint` 合格をテストに追加 ✅
   - _Requirements: R6-9, R7-7_ / _Design: D-10_
-- [ ] **3.5** 実環境にデプロイして Logs を確認する
+- [ ] **3.5** 実環境にデプロイして Logs を確認する → 🔴 **未実施（AWS 環境が必要）**
   - スタック作成 → 送信 → CloudWatch Logs にレコードが出ることを確認
   - Logs Insights のクエリ（`design.md` 5.3 節）でレコードを検索できることを確認
   - ロググループの保持期間が 3 日になっていることを確認
   - **記録**: verification-log に 1 エントリ
   - _Requirements: R4-3, R4-5, R4-6_
-- [ ] **3.6** 2 本のルールが独立に動作することを確認する
+- [ ] **3.6** 2 本のルールが独立に動作することを確認する → 🔴 **未実施**
   - 基本ルールと Lambda ルールが同一メッセージに対して両方発火していることを確認
   - Lambda を意図的に失敗させ（例：一時的に権限を外す）、基本ルール側の CloudWatch Metrics 送信が継続することを確認
   - **記録**: verification-log に 1 エントリ
   - _Requirements: R4-8_ / _Design: 7_
-- [ ] **3.7** 欠落フィールドの挙動を実環境で確認する
+- [ ] **3.7** 欠落フィールドの挙動を実環境で確認する → 🔴 **未実施**（ユニットテストでは Pass）
   - `cpu` を含まないメッセージを手動 publish（MQTT テストクライアント）し、Lambda が `WARN` で継続することを確認
   - **記録**: verification-log に 1 エントリ
   - _Requirements: R4-4_
 
-**M3 の Definition of Done**
-- R4 のユニットテストとインライン同期テストが全件成功
-- Logs Insights でレコードを検索できる
-- 2 本のルールの独立動作を確認済み
-- verification-log に M3 の全エントリが記録済み
+**M3 の Definition of Done** → 🟡 **未達成**
+- [x] R4 のユニットテストとインライン同期テストが全件成功（29 件 Pass）
+- [ ] Logs Insights でレコードを検索できる → **未実施**
+- [ ] 2 本のルールの独立動作を確認済み → **未実施**
+- [ ] verification-log に M3 の全エントリが記録済み → **M3-UT のみ記録。3.5〜3.7 は空欄**
 
 ---
 
 ### M4：アドバンス B（Alarm → SNS → Email）
 
-- [ ] **4.1** `advanced-alarm.yaml` を実装する
+- [x] **4.1** `advanced-alarm.yaml` を実装する
   - パラメータ: `DeviceNumber` / `NotificationEmail`（`AllowedPattern` でメール形式を検証、`NoEcho` は使わない）/ `CpuAlarmThreshold`（80）/ `AlarmPeriodSeconds`（60）/ `AlarmEvaluationPeriods`（1）/ `EnableOkNotification`（true）
   - SNS トピックに `DisplayName: JAWSUG-IoT-Handson` を設定
   - Alarm は `CpuUtilization-raspi-{n}` を対象、統計は平均、`TreatMissingData: notBreaching`
   - `Conditions` + `Fn::If` で `OKActions` を切り替え
   - Outputs に `AlarmTopicArn` / `AlarmName` / `AlarmConsoleUrl` / 承認リマインド
+  - ⚠️ しきい値・期間は `design.md` の暫定値のまま。**Q2 の最終確定は 4.5 待ち**
   - _Requirements: R5-1, R5-3, R5-6, R5-7, R6-4, R6-5, NFR-7_ / _Design: 5.3, D-11, D-13_
-- [ ] **4.2** テンプレート検証テストを追加する
-  - `cfn-lint` 合格 / `TreatMissingData` の明示 / `Period` が 60 以上 / メールの `AllowedPattern` の存在 / 必須 Outputs
-  - _Requirements: R5-6, R6-5, R6-9, R7-7_ / _Design: 4.3_
-- [ ] **4.3** デプロイしてサブスクリプションを承認する
+- [x] **4.2** テンプレート検証テストを追加する
+  - `cfn-lint` 合格 / `TreatMissingData` の明示 / `Period` が 60 以上 / メールの `AllowedPattern` の存在 / 必須 Outputs ✅ 5 件 Pass
+  - _Requirements: R5-6, R6-5, R6-9, R7-7_ / _Design: 4.3_ / **証跡: `evidence/m2/2.5-cfn-lint.txt`（M4-0）**
+- [ ] **4.3** デプロイしてサブスクリプションを承認する → 🔴 **未実施（AWS 環境とメールアドレスが必要）**
   - スタック作成中に確認メールが届くことを確認（差出人 `no-reply@sns.amazonaws.com`、迷惑メールフォルダも確認）
   - 承認後、SNS コンソールでステータスが `Confirmed` になることを確認
   - **CloudFormation が承認を待たずに `CREATE_COMPLETE` になる**ことを実際に確認し、記録に残す（K-6 の裏付け）
   - **記録**: verification-log に 1 エントリ（メールアドレスはマスク）
   - _Requirements: R5-2, R9-7_ / _Design: D-13, K-6_
-- [ ] **4.4** アラーム発火とメール受信を確認する
+- [ ] **4.4** アラーム発火とメール受信を確認する → 🔴 **未実施**
   - `load_gen.py cpu --target 90 --duration 180` を実行
   - Alarm が `OK` → `ALARM` に遷移することを確認（履歴タブ）
   - 5 分以内にメールが届くことを確認
   - 負荷終了後に `ALARM` → `OK` へ戻り、復旧通知が届くことを確認
   - **記録**: verification-log に 1 エントリ（発火までの所要時間を計測）
   - _Requirements: R5-4, R5-5, R5-7, R5-8_
-- [ ] **4.5** しきい値・期間の既定値を最終確定する（Q2）
+- [ ] **4.5** しきい値・期間の既定値を最終確定する（Q2）→ 🔴 **未実施（Q2 は暫定のまま）**
   - 4.4 の実測をもとに、確実に発火し誤発火しない値を確定
   - 送信を止めた状態で誤発火しないこと（`TreatMissingData: notBreaching` の効果）を確認
   - 必要なら `design.md` と `requirements.md` R5-3 の既定値を更新
   - **記録**: verification-log に 1 エントリ
   - _Requirements: R5-3, R5-6, R5-8_ / _Design: Q2, 4.3_
-- [ ] **4.6** スタック再作成時の再承認を確認する
+- [ ] **4.6** スタック再作成時の再承認を確認する → 🔴 **未実施**
   - スタックを削除して再作成し、確認メールが再送されて再承認が必要になることを確認
   - ハマりポイント表に載せる文言を確定
   - **記録**: verification-log に 1 エントリ
   - _Design: K-6_
 
-**M4 の Definition of Done**
-- R5 のテンプレート検証テストが全件成功
-- 実際にメールが届き、復旧通知も確認済み
-- しきい値・期間の既定値が実測に基づいて確定
-- verification-log に M4 の全エントリが記録済み
+**M4 の Definition of Done** → 🟡 **未達成**
+- [x] R5 のテンプレート検証テストが全件成功（5 件 Pass、`cfn-lint` 合格）
+- [ ] 実際にメールが届き、復旧通知も確認済み → **未実施**
+- [ ] しきい値・期間の既定値が実測に基づいて確定 → **未実施（暫定値）**
+- [ ] verification-log に M4 の全エントリが記録済み → **M4-0 のみ記録。4.3〜4.6 は空欄**
 
 ---
 
@@ -362,13 +427,14 @@ M3 と M4 は M2 完了後に並行実施可能。
   - M1〜M4 で実際に遭遇した事象を必ず反映する
   - 最低限含める項目: 時刻ずれ（K-1）／`free` と CloudWatch の値が合わない（K-2）／ルール名にハイフン（K-4）／メトリクスが表示されない（期間 5 分のまま）／メールが来ない（未承認・迷惑メール・打ち間違い・再作成後の再承認）／`externally-managed-environment`／証明書パス誤り／ポリシー未アタッチ
   - _Requirements: R8-4_ / _Design: 9_
-- [ ] **5.8** `teardown.sh` を実装し、後片付けセクションを書く
-  - 削除対象の一覧表示と `y/N` 確認
-  - 証明書デタッチ・無効化・削除 → アドバンス B → アドバンス A → 基本の順でスタック削除（存在するものだけ）
-  - ローカル `certs/` 削除
-  - 残存確認結果の表示
-  - **CloudWatch Metrics には削除 API がなく保持期間経過で消える**ことを出力で明示
-  - `DEVICE_NUMBER=001 bash teardown.sh` で実行できることを確認
+- [ ] **5.8** `teardown.sh` を実装し、後片付けセクションを書く → 🟡 **スクリプトのみ実装済み・未実行**
+  - [x] 削除対象の一覧表示と `y/N` 確認
+  - [x] 証明書デタッチ・無効化・削除 → アドバンス B → アドバンス A → 基本の順でスタック削除（存在するものだけ）
+  - [x] ローカル `certs/` 削除
+  - [x] 残存確認結果の表示（Thing / ルール / スタック / SNS トピック）
+  - [x] **CloudWatch Metrics には削除 API がなく保持期間経過で消える**ことを出力で明示
+  - [ ] `DEVICE_NUMBER=001 bash teardown.sh` で実行できることを確認 → 🔴 **未実行（AWS 環境が必要）**
+  - [ ] 手順書の後片付けセクション → **未着手**
   - _Requirements: R8-7, R8-8, R8-9_ / _Design: 5.4_
 - [ ] **5.9** ルート `README.md` を更新する
   - 第3回の行を `T.B.D.` から `docs/session-03/handson.md` へのリンクに変更
@@ -389,10 +455,14 @@ M3 と M4 は M2 完了後に並行実施可能。
   - `certs/` がコミットされていないことを確認
   - _Requirements: R7-9, R9-5, R9-7, NFR-6, NFR-12_
 
-**M5 の Definition of Done**
-- 手順書・構成図・README が揃い、通し実行が 90 分以内で完了
-- `teardown.sh` で全リソースが削除できる
-- `verification-log.md` の全エントリが Pass、機微情報のマスキング済み
+**M5 の Definition of Done** → 🔴 **未達成（ほぼ未着手）**
+- [ ] 手順書・構成図・README が揃い、通し実行が 90 分以内で完了 → **未着手**
+- [ ] `teardown.sh` で全リソースが削除できる → **実装済み・未実行**
+- [ ] `verification-log.md` の全エントリが Pass、機微情報のマスキング済み → **静的検証分のみ Pass**
+
+> 5.7（ハマりポイント表）には、開発中に実際に遭遇した事象が 3 件ある
+> （`cfn-lint W1020`、負荷生成の目標値と実測値の乖離、`yaml.safe_load` の CFN タグ非対応）。
+> `verification-log.md` 4 章の M5 チェックリストに反映候補として記載済み。
 
 ---
 
@@ -448,8 +518,60 @@ graph LR
 
 ## 6. 決定待ち事項
 
-| ID | 内容 | 期限 |
+| ID | 内容 | 期限 | 状況 |
+| --- | --- | --- | --- |
+| Q7 | 構成図を新規作成するか流用改変するか | 0.6 | ✅ **解消**：新規作成で確定（3 経路を 1 枚で表現） |
+| Q8 | Lambda ランタイムのバージョン | 0.6 / 3.3 着手時 | 🟡 **暫定確定**：`python3.13`。実デプロイ（3.5）でサポート確認が必要 |
+| Q2 | Alarm のしきい値・評価期間の既定値 | 4.5 | 🔴 **未解消**：暫定値（80% / 60 秒 / 1 回）のまま。実測が必要 |
+| 新規 | 負荷生成の目標値と実測値の乖離をどう扱うか（実装補正 / R2-11 見直し / 手順書での解釈明示） | 1.15 | 🔴 **未解消**：実機実測後に判断 |
+| 新規 | spec ディレクトリ名の表記統一（文書は `specs/`、実体は `spec/`） | 5.11 | 🔴 **未解消** |
+| — | connpass イベントページ URL | 5.9 | 🔴 **未確定** |
+
+---
+
+## 7. 実装済み成果物の一覧（2026-08-08 時点）
+
+### デバイス側スクリプト（`scripts/session-03/`）
+
+| ファイル | 状態 | 検証状況 |
 | --- | --- | --- |
-| Q7 | 構成図を新規作成するか流用改変するか（新規作成を推奨） | 0.6 |
-| Q8 | Lambda ランタイムのバージョン | 0.6 / 3.3 着手時 |
-| — | connpass イベントページ URL | 5.9 |
+| `metrics.py` | 実装済み | ユニットテスト 27 件 Pass ＋ ローカル疎通確認済み |
+| `metrics_publisher.py` | 実装済み | **未実行**（実機・実 AWS 環境が必要） |
+| `simulator.py` | 実装済み | **未実行**（実 AWS 環境が必要） |
+| `load_gen.py` | 実装済み | ユニットテスト 22 件 Pass ＋ 開発機で短時間 CLI 実行。⚠️ 目標値との乖離あり |
+| `show_metrics.sh` | 実装済み | **未実行**（`/proc` 依存のため Linux 実機が必要） |
+| `teardown.sh` | 実装済み | **未実行**（AWS 環境が必要） |
+| `lambda/metrics_logger.py` | 実装済み | ユニットテスト 11 件 Pass。実 Lambda での実行は未検証 |
+
+### CloudFormation（`cfn/session-03/`）
+
+| ファイル | 状態 | 検証状況 |
+| --- | --- | --- |
+| `iot-rules-cloudwatch.yaml` | 実装済み | `cfn-lint` 合格 ＋ 構造テスト 6 件 Pass。**デプロイ未実施** |
+| `advanced-lambda.yaml` | 実装済み | `cfn-lint` 合格 ＋ 構造テスト 3 件 Pass ＋ インライン同期 Pass。**デプロイ未実施** |
+| `advanced-alarm.yaml` | 実装済み | `cfn-lint` 合格 ＋ 構造テスト 5 件 Pass。**デプロイ未実施** |
+
+### テスト（`scripts/session-03/tests/`）
+
+| ファイル | ケース数 | 結果 |
+| --- | --- | --- |
+| `test_metrics.py` | 27 | Pass |
+| `test_load_gen.py` | 22 | Pass |
+| `test_metrics_logger.py` | 11 | Pass |
+| `test_templates.py` | 17 | Pass |
+| `test_lambda_inline_sync.py` | 1 | Pass |
+| **合計** | **78** | **全件 Pass** |
+
+### 未作成（M5）
+
+- `docs/session-03/handson.md`
+- `docs/session-03/architecture.drawio.svg`
+- ルート `README.md` の第3回リンク更新・ディレクトリ構成図追記
+
+### 設計書に記載があるが未実装のテスト
+
+| 内容 | 対応タスク | 代替手段 |
+| --- | --- | --- |
+| CPU 負荷ワーカー起動のモックテスト | 1.11 | 開発機での CLI スモークテスト（M1-S） |
+| `--duration` 経過後のメモリ解放の自動テスト | 1.12 | 同上 |
+| `SIGINT` でクリーンアップ関数が呼ばれる自動テスト | 1.13 | 同上（三重の解放保証はコードで実装） |

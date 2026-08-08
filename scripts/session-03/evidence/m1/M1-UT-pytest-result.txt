@@ -1,0 +1,62 @@
+# M1-UT ユニットテスト（タスク 1.1〜1.13）
+# 実施日時: 2026-08-08 23:54 JST
+# コマンド: pytest tests/test_metrics.py tests/test_load_gen.py -v
+
+============================= test session starts ==============================
+platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
+configfile: pytest.ini
+collecting ... collected 49 items
+
+tests/test_metrics.py::TestValidatePercent::test_normal_value PASSED     [  2%]
+tests/test_metrics.py::TestValidatePercent::test_clamp_below_zero PASSED [  4%]
+tests/test_metrics.py::TestValidatePercent::test_clamp_above_100 PASSED  [  6%]
+tests/test_metrics.py::TestValidatePercent::test_round_to_one_decimal PASSED [  8%]
+tests/test_metrics.py::TestValidatePercent::test_boundary_zero PASSED    [ 10%]
+tests/test_metrics.py::TestValidatePercent::test_boundary_100 PASSED     [ 12%]
+tests/test_metrics.py::TestValidatePercent::test_integer_input PASSED    [ 14%]
+tests/test_metrics.py::TestValidatePercent::test_non_numeric_raises PASSED [ 16%]
+tests/test_metrics.py::TestValidatePercent::test_none_raises PASSED      [ 18%]
+tests/test_metrics.py::TestValidatePercent::test_nan_raises PASSED       [ 20%]
+tests/test_metrics.py::TestValidatePercent::test_inf_raises PASSED       [ 22%]
+tests/test_metrics.py::TestBuildPayload::test_returns_four_fields PASSED [ 24%]
+tests/test_metrics.py::TestBuildPayload::test_device_id_is_string PASSED [ 26%]
+tests/test_metrics.py::TestBuildPayload::test_cpu_is_float PASSED        [ 28%]
+tests/test_metrics.py::TestBuildPayload::test_memory_is_float PASSED     [ 30%]
+tests/test_metrics.py::TestBuildPayload::test_timestamp_is_int PASSED    [ 32%]
+tests/test_metrics.py::TestBuildPayload::test_no_extra_fields PASSED     [ 34%]
+tests/test_metrics.py::TestBuildPayload::test_cpu_clamped PASSED         [ 36%]
+tests/test_metrics.py::TestReadCpuPercent::test_returns_mocked_value PASSED [ 38%]
+tests/test_metrics.py::TestReadCpuPercent::test_returns_zero PASSED      [ 40%]
+tests/test_metrics.py::TestReadMemoryPercent::test_correct_definition PASSED [ 42%]
+tests/test_metrics.py::TestReadMemoryPercent::test_rounds_to_one_decimal PASSED [ 44%]
+tests/test_metrics.py::TestFormatStdoutLine::test_contains_send_prefix PASSED [ 46%]
+tests/test_metrics.py::TestFormatStdoutLine::test_contains_jst PASSED    [ 48%]
+tests/test_metrics.py::TestFormatStdoutLine::test_contains_cpu_value PASSED [ 51%]
+tests/test_metrics.py::TestFormatStdoutLine::test_contains_memory_value PASSED [ 53%]
+tests/test_metrics.py::TestFormatStdoutLine::test_single_line PASSED     [ 55%]
+tests/test_load_gen.py::TestValidateCpuTarget::test_valid_target PASSED  [ 57%]
+tests/test_load_gen.py::TestValidateCpuTarget::test_boundary_1 PASSED    [ 59%]
+tests/test_load_gen.py::TestValidateCpuTarget::test_boundary_100 PASSED  [ 61%]
+tests/test_load_gen.py::TestValidateCpuTarget::test_below_1_raises PASSED [ 63%]
+tests/test_load_gen.py::TestValidateCpuTarget::test_above_100_raises PASSED [ 65%]
+tests/test_load_gen.py::TestValidateCpuTarget::test_negative_raises PASSED [ 67%]
+tests/test_load_gen.py::TestValidateCpuTarget::test_non_numeric_raises PASSED [ 69%]
+tests/test_load_gen.py::TestValidateMemoryTarget::test_within_limit PASSED [ 71%]
+tests/test_load_gen.py::TestValidateMemoryTarget::test_exceeds_limit_clamped PASSED [ 73%]
+tests/test_load_gen.py::TestValidateMemoryTarget::test_negative_raises PASSED [ 75%]
+tests/test_load_gen.py::TestValidateMemoryTarget::test_zero_raises PASSED [ 77%]
+tests/test_load_gen.py::TestValidateMemoryTarget::test_exactly_at_limit PASSED [ 79%]
+tests/test_load_gen.py::TestCalculateDutyCycle::test_90_percent PASSED   [ 81%]
+tests/test_load_gen.py::TestCalculateDutyCycle::test_50_percent PASSED   [ 83%]
+tests/test_load_gen.py::TestCalculateDutyCycle::test_100_percent PASSED  [ 85%]
+tests/test_load_gen.py::TestCalculateDutyCycle::test_1_percent PASSED    [ 87%]
+tests/test_load_gen.py::TestCalculateDutyCycle::test_zero_cpu_count_raises PASSED [ 89%]
+tests/test_load_gen.py::TestMemoryPercentToMb::test_50_percent_of_4096 PASSED [ 91%]
+tests/test_load_gen.py::TestMemoryPercentToMb::test_100_percent PASSED   [ 93%]
+tests/test_load_gen.py::TestMemoryPercentToMb::test_0_percent PASSED     [ 95%]
+tests/test_load_gen.py::TestFormatJst::test_contains_jst PASSED          [ 97%]
+tests/test_load_gen.py::TestFormatJst::test_contains_date_format PASSED  [100%]
+
+============================== 49 passed in 0.05s ==============================

@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  JAWS-UG IoT Handson Session 3 (Basic) - IoT Rules Engine to CloudWatch Metrics.
+  Creates IoT Thing, Policy, IoT Rule with CloudWatch Metric actions.
+  Issue the certificate manually (private key cannot be retrieved via CloudFormation).
+
+# ------------------------------------------------------------
+# パラメータ
+# ------------------------------------------------------------
+Parameters:
+  DeviceNumber:
+    Type: String
+    Default: "001"
+    AllowedPattern: "^[0-9]{3}$"
+    ConstraintDescription: "3桁の数字を入力してください（例: 001）"
+    Description: "デバイス番号（3桁数字）。リソース名の一部として使用されます。"
+
+  MetricNamespace:
+    Type: String
+    Default: "JAWSUG/IoTHandson"
+    Description: "CloudWatch Metrics の名前空間"
+
+# ------------------------------------------------------------
+# リソース
+# ------------------------------------------------------------
+Resources:
+
+  # IoT Thing
+  IoTThing:
+    Type: AWS::IoT::Thing
+    Properties:
+      ThingName: !Sub "jawsug-raspi-${DeviceNumber}"
+
+  # IoT Policy（最小権限: Connect + Publish を自トピックのみに限定）
+  IoTPolicy:
+    Type: AWS::IoT::Policy
+    Properties:
+      PolicyName: !Sub "jawsug-s3-policy-raspi-${DeviceNumber}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: iot:Connect
+            Resource: !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:client/jawsug-raspi-${DeviceNumber}"
+          - Effect: Allow
+            Action: iot:Publish
+            Resource: !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/jawsug/session-03/raspi-${DeviceNumber}/metrics"
+
+  # ルールエラー用ロググループ（保持 3 日）
+  RuleErrorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: "/aws/iot/session-03/rule-errors"
+      RetentionInDays: 3
+
+  # IoT ルール用 IAM ロール
+  IoTRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "jawsug-s3-iot-rule-role-raspi-${DeviceNumber}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: iot.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchMetricsPut
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: !Ref MetricNamespace
+        - PolicyName: CloudWatchLogsWrite
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: !Sub "${RuleErrorLogGroup.Arn}:*"
+
+  # IoT ルール（基本）: 単一ルール内に CloudwatchMetric アクションを 2 つ（R3-3）
+  MetricsToCloudWatchRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: !Sub "jawsug_s3_metrics_to_cw_raspi_${DeviceNumber}"
+      TopicRulePayload:
+        AwsIotSqlVersion: "2016-03-23"
+        RuleDisabled: false
+        Sql: "SELECT * FROM 'jawsug/session-03/+/metrics'"
+        Actions:
+          - CloudwatchMetric:
+              RoleArn: !GetAtt IoTRuleRole.Arn
+              MetricNamespace: !Ref MetricNamespace
+              MetricName: "CpuUtilization-${topic(3)}"
+              MetricUnit: "Percent"
+              MetricValue: "${cast(cpu AS String)}"
+              MetricTimestamp: "${cast(timestamp AS String)}"
+          - CloudwatchMetric:
+              RoleArn: !GetAtt IoTRuleRole.Arn
+              MetricNamespace: !Ref MetricNamespace
+              MetricName: "MemoryUtilization-${topic(3)}"
+              MetricUnit: "Percent"
+              MetricValue: "${cast(memory AS String)}"
+              MetricTimestamp: "${cast(timestamp AS String)}"
+        ErrorAction:
+          CloudwatchLogs:
+            RoleArn: !GetAtt IoTRuleRole.Arn
+            LogGroupName: !Ref RuleErrorLogGroup
+
+# ------------------------------------------------------------
+# 出力
+# ------------------------------------------------------------
+Outputs:
+  ThingName:
+    Description: "IoT Thing name"
+    Value: !Sub "jawsug-raspi-${DeviceNumber}"
+
+  MetricsTopic:
+    Description: "MQTT topic for metrics publishing"
+    Value: !Sub "jawsug/session-03/raspi-${DeviceNumber}/metrics"
+
+  RuleName:
+    Description: "IoT Rule name"
+    Value: !Sub "jawsug_s3_metrics_to_cw_raspi_${DeviceNumber}"
+
+  MetricNamespace:
+    Description: "CloudWatch Metrics namespace"
+    Value: !Ref MetricNamespace
+
+  CpuMetricName:
+    Description: "CPU utilization metric name"
+    Value: !Sub "CpuUtilization-raspi-${DeviceNumber}"
+
+  MemoryMetricName:
+    Description: "Memory utilization metric name"
+    Value: !Sub "MemoryUtilization-raspi-${DeviceNumber}"
+
+  MetricsConsoleUrl:
+    Description: "CloudWatch Metrics console URL"
+    Value: "https://ap-northeast-1.console.aws.amazon.com/cloudwatch/home?region=ap-northeast-1#metricsV2:graph=~();namespace=~'JAWSUG*2fIoTHandson"
+
+  RuleErrorLogGroupName:
+    Description: "Log group for rule error actions"
+    Value: !Ref RuleErrorLogGroup
+
+  NextStep:
+    Description: "Next steps"
+    Value: !Sub >
+      [1] Issue certificate:
+      IoT Core > Manage > Things > jawsug-raspi-${DeviceNumber} > Certificates > Create certificate
+      > Download files (certificate.pem.crt / private.pem.key / AmazonRootCA1.pem)
+      > Click Activate
+      > Attach policy: jawsug-s3-policy-raspi-${DeviceNumber}
+      [2] Get Endpoint:
+      IoT Core > Settings > Device data endpoint > Copy endpoint

@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  JAWS-UG IoT Handson Session 3 (Advanced B) - CloudWatch Alarm to SNS Email.
+  Creates CloudWatch Alarm on CPU metric and sends notification via SNS Email.
+
+# ------------------------------------------------------------
+# パラメータ
+# ------------------------------------------------------------
+Parameters:
+  DeviceNumber:
+    Type: String
+    Default: "001"
+    AllowedPattern: "^[0-9]{3}$"
+    ConstraintDescription: "3桁の数字を入力してください（例: 001）"
+    Description: "デバイス番号（3桁数字）"
+
+  MetricNamespace:
+    Type: String
+    Default: "JAWSUG/IoTHandson"
+    Description: "CloudWatch Metrics の名前空間（基本編と同じ値を指定）"
+
+  NotificationEmail:
+    Type: String
+    AllowedPattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+    ConstraintDescription: "有効なメールアドレスを入力してください"
+    Description: "アラーム通知先メールアドレス（スタック作成後に確認メールが届きます）"
+
+  CpuAlarmThreshold:
+    Type: Number
+    Default: 80
+    Description: "CPU 使用率アラームのしきい値（%）"
+
+  AlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    MinValue: 60
+    Description: "アラーム評価期間（秒）。標準分解能メトリクスのため 60 以上"
+
+  AlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "アラーム評価回数"
+
+  EnableOkNotification:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: "ALARM → OK 復帰時の通知を有効にするか"
+
+# ------------------------------------------------------------
+# Conditions
+# ------------------------------------------------------------
+Conditions:
+  OkNotificationEnabled:
+    !Equals [!Ref EnableOkNotification, "true"]
+
+# ------------------------------------------------------------
+# リソース
+# ------------------------------------------------------------
+Resources:
+
+  # SNS トピック
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "jawsug-s3-alarm-raspi-${DeviceNumber}"
+      DisplayName: "JAWSUG-IoT-Handson"
+
+  # Email サブスクリプション（作成時に確認メールが送信される）
+  AlarmEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+  # CloudWatch Alarm（CPU 使用率）
+  CpuHighAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "jawsug-s3-cpu-high-raspi-${DeviceNumber}"
+      AlarmDescription: !Sub "CPU utilization exceeds ${CpuAlarmThreshold}% for raspi-${DeviceNumber}"
+      Namespace: !Ref MetricNamespace
+      MetricName: !Sub "CpuUtilization-raspi-${DeviceNumber}"
+      Statistic: Average
+      Period: !Ref AlarmPeriodSeconds
+      EvaluationPeriods: !Ref AlarmEvaluationPeriods
+      Threshold: !Ref CpuAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+      OKActions:
+        !If
+          - OkNotificationEnabled
+          - - !Ref AlarmTopic
+          - !Ref "AWS::NoValue"
+
+# ------------------------------------------------------------
+# 出力
+# ------------------------------------------------------------
+Outputs:
+  AlarmTopicArn:
+    Description: "SNS Topic ARN for alarm notifications"
+    Value: !Ref AlarmTopic
+
+  AlarmName:
+    Description: "CloudWatch Alarm name"
+    Value: !Sub "jawsug-s3-cpu-high-raspi-${DeviceNumber}"
+
+  AlarmConsoleUrl:
+    Description: "CloudWatch Alarm console URL"
+    Value: !Sub "https://ap-northeast-1.console.aws.amazon.com/cloudwatch/home?region=ap-northeast-1#alarmsV2:alarm/jawsug-s3-cpu-high-raspi-${DeviceNumber}"
+
+  ConfirmSubscriptionNote:
+    Description: "Important: Subscription confirmation required"
+    Value: !Sub >
+      [重要] ${NotificationEmail} に確認メール（件名: AWS Notification - Subscription Confirmation）
+      が届いています。リンクをクリックして承認してください。
+      承認前はアラームが発火してもメールは届きません。
+      差出人: no-reply@sns.amazonaws.com（迷惑メールフォルダも確認してください）
