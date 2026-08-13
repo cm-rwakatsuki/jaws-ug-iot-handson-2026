@@ -2,22 +2,20 @@
 
 > ## 🚧 執筆ステータス（公開前に必ずこのブロックを削除する）
 >
-> 本手順書は **作成途中** です。実 AWS 環境・実機での検証（`spec/tasks.md` の M2〜M4）が
-> 未完了のため、以下のセクションは未確定です。
+> **UI 手順のドラフトです。** コンソールを実際に通しながら、画面名・ボタン名・順序を修正してください。
+> 自信が持てなかった箇所には **🔎** を付けてあります（コンソールの表記は変わるため）。
 >
-> | セクション | 状態 | 埋めるための作業 |
-> | --- | --- | --- |
-> | ゴール / 進め方 / 所要時間 / 学習内容 | ✅ 記述済み（実測不要） | — |
-> | 構成図 | ✅ 完成（`architecture-v2.svg` / 元ファイル `architecture-v2.drawio`） | — |
-> | AWS 側設定 | 🚧 骨格のみ | タスク 2.6（画面操作の確認） |
-> | 実装（Raspberry Pi） | 🚧 骨格のみ | タスク 1.15 |
-> | 動作確認 | 🚧 骨格のみ | タスク 2.7〜2.9 |
-> | デバイス側での確認 | 🚧 骨格のみ | タスク 1.15 |
-> | Advanced Course1 / 2 | ❌ 未着手 | タスク 3.5〜3.7 / 4.3〜4.6 |
-> | ハマりポイント | 🚧 設計時の想定のみ | タスク 5.7（M1〜M4 の実績を反映） |
-> | 後片付け | 🚧 骨格のみ | タスク 5.8 |
+> | セクション | 状態 |
+> | --- | --- |
+> | ゴール / 進め方 / 所要時間 / 学習内容 / 構成図 | ✅ 確定 |
+> | AWS 側設定 | 🔎 **要ウォークスルー**（スタック作成・ルール確認・証明書・Endpoint） |
+> | 実装（Raspberry Pi） | 🔎 **要実機確認**（転送・venv・実行の出力例） |
+> | 動作確認 / デバイス側での確認 | 🔎 **要実機＋コンソール確認**（実測値・スクリーンショット） |
+> | Advanced Course1 / 2 | 🔎 **要ウォークスルー** |
+> | ハマりポイント | 🚧 設計時の想定＋開発中に遭遇した分のみ。当日リハーサルで追記 |
 >
-> 検証の実行手順は [`../../scripts/session-03/spec/next-actions.md`](../../scripts/session-03/spec/next-actions.md) にまとめてあります。
+> スクリーンショットは未挿入です。ウォークスルー時に取得し、`docs/session-03/images/` に置いて
+> Markdown の画像記法で挿入してください。
 
 ## ゴール
 
@@ -35,11 +33,11 @@
 
 ## 進め方
 
-Raspberry Pi から CPU 使用率とメモリ使用率を送信し、Rules 経由で CloudWatch Metrics に格納してグラフで可視化します。さらに負荷生成スクリプトで意図的に使用率を上下させ、**自分の操作がクラウドのグラフに現れる**ことを確認します。
+**参加者全員が会場で貸出 Raspberry Pi（実機）を操作します。**
 
-AWS 側の設定から動作確認まで、**この手順書だけで完結**します。第1回・第2回の受講は前提としません。
+Raspberry Pi から CPU 使用率とメモリ使用率を送信し、Rules 経由で CloudWatch Metrics に格納してグラフで可視化します。さらに負荷生成スクリプトで意図的に使用率を上下させ、**自分がかけた負荷がクラウドのグラフに現れる**ことを確認します。
 
-今回は**参加者全員が会場で貸出 Raspberry Pi（実機）を操作**します。自分が動かした負荷が、そのままクラウドのグラフに現れるところまでを手を動かして確認します。
+AWS 側の設定はすべて**マネジメントコンソール**で進めます。第1回・第2回の受講は前提としません。
 
 ---
 
@@ -48,7 +46,7 @@ AWS 側の設定から動作確認まで、**この手順書だけで完結**し
 | パート | 時間 |
 |---|---|
 | Wi-Fi 接続と SSH 接続 | 10分 |
-| AWS 側設定（スタック作成・証明書発行） | 20分 |
+| AWS 側設定（スタック作成・ルール確認・証明書・Endpoint） | 20分 |
 | デバイス側実装（転送・セットアップ・実行） | 20分 |
 | 動作確認（負荷生成・グラフ確認・値の突き合わせ） | 15分 |
 | Advanced Course1（Lambda 連携） | 10分 |
@@ -93,7 +91,7 @@ AWS IoT Core に届いた MQTT メッセージを **SQL で選別し、他の AW
 
 ### 置換テンプレート
 
-SQL の中では `${...}` の形で値を差し込めます。今回使うのは次の 2 つです。
+SQL やアクションの設定値の中では `${...}` の形で値を差し込めます。今回使うのは次の 2 つです。
 
 | 書き方 | 意味 |
 |---|---|
@@ -114,9 +112,7 @@ SQL の中では `${...}` の形で値を差し込めます。今回使うのは
 | **Advanced Course1** | 様々な AWS サービスと連携する | Rules → Lambda → CloudWatch Logs |
 | **Advanced Course2** | 自動連携する | CloudWatch → Alarm → SNS → メール |
 
-図の中心にある **Rules** が今回の主役です。ここから先を差し替えるだけで、CloudWatch にも Lambda にも
-つながることが図から読み取れます。Advanced Course1 と Advanced Course2 は、どちらも
-**Basic Course で作ったものをそのまま使い、Rules の先を増やしているだけ**です。
+図の中心にある **Rules** が今回の主役です。ここから先を差し替えるだけで、CloudWatch にも Lambda にもつながることが図から読み取れます。Advanced Course1 と Advanced Course2 は、どちらも **Basic Course で作ったものをそのまま使い、Rules の先を増やしているだけ**です。
 
 ### この回の核心：アクションによって SQL の効き方が変わる
 
@@ -150,7 +146,7 @@ CloudWatch では通常、`DeviceId=raspi-001` のような **Dimension**（次�
 | 名前空間 | `JAWSUG/IoTHandson`（全員共通） |
 | メトリクス名 | `CpuUtilization-raspi-001` / `MemoryUtilization-raspi-001` |
 
-> Dimension を使いたい場合は、Lambda を経由して自分で `PutMetricData` を呼ぶという選択肢があります。これが Advanced Course1 のもう一つの動機です。制約を知ると、なぜ Lambda を挟む構成が世の中に多いのかが見えてきます。
+> この制約のせいで、コンソールでメトリクスを探すときは「**ディメンションなし**」のグループを開くことになります（後述）。Dimension を使いたい場合は Lambda を経由して自分で `PutMetricData` を呼ぶ、という選択肢があります。これが Advanced Course1 のもう一つの動機です。
 
 #### メトリクスは 60 秒粒度で保存される
 
@@ -168,91 +164,341 @@ CloudWatch では通常、`DeviceId=raspi-001` のような **Dimension**（次�
 
 ## AWS 側設定
 
-> 🚧 **このセクションは骨格のみです**（タスク 2.6 で実画面を確認して記述します）。
+**Thing・IoT ポリシー・IAM ロール・ロググループ・IoT ルール**を作成します。すべて CloudFormation テンプレートに定義済みなので、**コンソールからアップロードするだけ**です。
 
-デバイスを AWS IoT Core に接続し、Rules で CloudWatch Metrics へ流すための構成を作ります。
+> 秘密鍵は CloudFormation では取得できないため、**証明書だけは手動で発行**します（第2回と同じ）。
 
-- CloudFormation テンプレート：[cfn/session-03/iot-rules-cloudwatch.yaml](../../cfn/session-03/iot-rules-cloudwatch.yaml)
-- スタック名：`jawsug-iot-handson-s3-001`
-- パラメータ：`DeviceNumber` = `001`（3 桁数字）
+### 1. テンプレートのダウンロード
 
-作成されるリソース：
+[cfn/session-03/iot-rules-cloudwatch.yaml](../../cfn/session-03/iot-rules-cloudwatch.yaml) をダウンロードします。
+
+> **リポジトリをクローン済みの場合はこの手順は不要です。** `cfn/session-03/iot-rules-cloudwatch.yaml` をそのまま使用してください。
+
+### 2. スタックの作成
+
+1. AWS マネジメントコンソール →（**東京リージョン** `ap-northeast-1`）→ **CloudFormation** →「スタックの作成」→「新しいリソースを使用」
+2. 「テンプレートファイルのアップロード」→ `cfn/session-03/iot-rules-cloudwatch.yaml` を選択
+3. スタック名：`jawsug-iot-handson-s3-001`
+4. パラメータを入力：
+   - `DeviceNumber`：`001`（**割り当てられた 3 桁の番号**）
+   - `MetricNamespace`：`JAWSUG/IoTHandson`（変更不要）
+5. 「次へ」→「次へ」
+6. 🔎 最後の確認画面で「**AWS CloudFormation によって IAM リソースが作成される場合があることを承認します**」にチェックを入れる
+7. 「送信」
+8. ステータスが `CREATE_COMPLETE` になるまで待つ（**1〜2 分**）
+
+> ⚠️ `DeviceNumber` は**3 桁の数字**です（`001` など）。`raspi-001` のように文字を入れると、IoT ルール名に使えない文字が含まれてスタック作成が失敗します。
+
+<details>
+<summary>作成されるリソース（5 個）</summary>
 
 | リソース | 名前 |
 |---|---|
 | IoT Thing | `jawsug-raspi-001` |
 | IoT ポリシー | `jawsug-s3-policy-raspi-001` |
+| IAM ロール（ルール用） | `jawsug-s3-iot-rule-role-raspi-001` |
+| ロググループ（エラー用） | `/aws/iot/session-03/rule-errors-raspi-001` |
 | IoT ルール | `jawsug_s3_metrics_to_cw_raspi_001` |
-| ルールエラー用ロググループ | `/aws/iot/session-03/rule-errors-raspi-001` |
 
-証明書は CloudFormation では発行できないため、第2回と同様に手動で発行してポリシーをアタッチします。
+</details>
 
-<!-- TODO(2.6): 以下を実画面で確認して記述
-  - スタック作成の画面手順（第2回の A ルートに準拠）
-  - Outputs の確認（8 項目のうち控えるべきもの）
-  - 証明書の発行・アクティブ化・ポリシーアタッチ
-  - Endpoint の取得
--->
+### 3. 出力の確認
+
+スタック →「出力」タブを開き、以下を控えておきます。
+
+| キー | 内容 |
+|---|---|
+| `ThingName` | モノの名前（`jawsug-raspi-001`） |
+| `MetricsTopic` | デバイスが Publish するトピック（`jawsug/session-03/raspi-001/metrics`） |
+| `CpuMetricName` / `MemoryMetricName` | あとで CloudWatch で探すメトリクス名 |
+| `MetricsConsoleUrl` | CloudWatch メトリクス画面へのリンク |
+
+### 4. 作られたルールを見てみる（今回の主役）
+
+**ここが今回いちばん見てほしい画面です。** テンプレートが何を作ったのかを、自分の目で確認します。
+
+1. **AWS IoT Core** →左メニュー「**メッセージのルーティング**」→「**ルール**」
+2. `jawsug_s3_metrics_to_cw_raspi_001` を選択
+3. 次の 3 点を確認します。
+
+| 見るところ | 何が書かれているか |
+|---|---|
+| **SQL ステートメント** | `SELECT * FROM 'jawsug/session-03/+/metrics'`（`+` がワイルドカード） |
+| **アクション** | `CloudWatch メトリクス` が **2 つ**（CPU 用とメモリ用） |
+| **エラーアクション** | `CloudWatch Logs`（アクションが失敗したときの記録先） |
+
+4. 🔎 アクションの詳細を開くと、次の値が入っています。**`${...}` がそのまま残っている**ことを確認してください。
+
+```
+メトリクス名      : CpuUtilization-${topic(3)}
+メトリクス値      : ${cast(cpu AS String)}
+メトリクスの単位  : Percent
+タイムスタンプ    : ${cast(timestamp AS String)}
+```
+
+> この `${topic(3)}` が、メッセージが届いた瞬間に `raspi-001` へ置き換わります。**ルールを 1 本書けば、デバイスが何台に増えても同じ定義で動く**ということです。
+
+### 5. 証明書の発行（手動・必須）
+
+CloudFormation では秘密鍵を取得できないため、証明書だけ手動で発行します。
+
+1. **IoT Core** →「**管理**」→「**すべてのデバイス**」→「**モノ**」→ `jawsug-raspi-001` を選択
+2. 「**証明書**」タブ →「**証明書を作成**」
+3. 「証明書とキーをダウンロード」ダイアログが表示される。**以下のファイルを必ずダウンロード**（後から再取得不可）
+
+```
+[OK] デバイス証明書     (xxxxx-certificate.pem.crt)
+[OK] パブリックキー     (xxxxx-public.pem.key)
+[OK] プライベートキー   (xxxxx-private.pem.key)
+[OK] Amazon Root CA 1  (AmazonRootCA1.pem)
+```
+
+4. **ダイアログ内**の「デバイス証明書」行にある「**証明書をアクティブ化**」をクリック
+
+> 💡 ダイアログを閉じてしまった場合：「証明書」タブの証明書 ID リンクをクリック → 証明書詳細ページの「アクション」→「有効化」
+
+5. 「完了」をクリックしてダイアログを閉じる
+6. `jawsug-raspi-001` の「証明書」タブに戻り、作成した証明書の**証明書 ID のリンク**をクリックして詳細ページを開く
+7. 証明書詳細ページの「**ポリシー**」タブ →「**ポリシーをアタッチ**」→ `jawsug-s3-policy-raspi-001` を選択してアタッチ
+
+> ⚠️ プライベートキーはこの画面でしかダウンロードできません。必ず保存してください。
+
+> ⚠️ **ポリシーのアタッチを忘れると、接続はできても Publish が拒否されます。** 手順 7 まで必ず実施してください。
+
+> 🔒 証明書ファイルは画面共有しないでください。
+
+### 6. Endpoint の取得
+
+1. **IoT Core** →「**接続**」→「**ドメイン設定**」
+2. 一覧から「**iot:Data-ATS**」の「ドメイン名」をコピーして控えておく
+
+```
+例：xxxxxxxxxxxxxx-ats.iot.ap-northeast-1.amazonaws.com
+```
+
+---
+
+## Wi-Fi 接続と SSH 接続
+
+1. PC を専用 Wi-Fi（`JAWSUG-IoT-PC`）に接続します。
+2. ラズパイの電源を入れます。
+3. ラズパイに SSH で接続します。
+
+```bash
+# ホスト名で接続する場合（ラズパイ本体に記載の名前を使用）
+ssh jawsug-user@ラズパイに記載の名前.local
+
+# または IP アドレスで接続する場合（ラズパイ本体に記載の IP を使用）
+ssh jawsug-user@ラズパイに記載のIP
+```
+
+ラズパイの Wi-Fi 接続は設定済みです（`JAWSUG-IoT-Pi`）。
+
+> 💡 このあと**ターミナルを 2〜3 枚使います**（送信・負荷生成・確認）。SSH のタブを複数開いておくと楽です。
 
 ---
 
 ## 実装（Raspberry Pi）
 
-> 🚧 **このセクションは骨格のみです**（タスク 1.15 で実機確認して記述します）。
+スクリプトは **PC 側（クローンしたリポジトリの `scripts/session-03/`）** で設定を書き換え、証明書とあわせて Raspberry Pi に転送してから実行します。
 
 使用するファイル：
 
 | ファイル | 役割 |
 |---|---|
-| [metrics.py](../../scripts/session-03/metrics.py) | CPU / メモリ取得とペイロード組み立て |
-| [metrics_publisher.py](../../scripts/session-03/metrics_publisher.py) | MQTT で送信するメインスクリプト |
-| [load_gen.py](../../scripts/session-03/load_gen.py) | 負荷生成（CPU / メモリ） |
-| [show_metrics.sh](../../scripts/session-03/show_metrics.sh) | デバイス側の使用率確認ヘルパー |
+| [metrics_publisher.py](../../scripts/session-03/metrics_publisher.py) | CPU / メモリを 10 秒間隔で送信するメインスクリプト |
+| [metrics.py](../../scripts/session-03/metrics.py) | 使用率の取得とペイロード組み立て（`metrics_publisher.py` が読み込む） |
+| [load_gen.py](../../scripts/session-03/load_gen.py) | CPU / メモリに負荷をかける |
+| [show_metrics.sh](../../scripts/session-03/show_metrics.sh) | デバイス側の実測値を表示する |
 
+> ⚠️ `metrics_publisher.py` は `metrics.py` を読み込みます。**2 つセットで転送**してください。
 
-書き換える設定：
+### ① PC 側での準備（証明書のリネームとスクリプトの設定）
+
+> ここは **手元の PC**（SSH 先の Raspberry Pi ではありません）で作業します。
+
+#### 証明書のリネームと配置
+
+ダウンロードした証明書を `scripts/session-03/certs/` に置き、スクリプトが参照する名前にリネームします。
+
+```bash
+# PC 側で実行（リポジトリのルートから）
+cd scripts/session-03
+mkdir -p certs
+```
+
+ダウンロードした 4 ファイルのうち 3 つを `certs/` に入れ、以下の名前にリネームします（パブリックキーは今回使いません）。
+
+| ダウンロードしたファイル | リネーム後（`certs/` 内） |
+|---|---|
+| `xxxxx-certificate.pem.crt` | `certificate.pem.crt` |
+| `xxxxx-private.pem.key` | `private.pem.key` |
+| `AmazonRootCA1.pem` | `AmazonRootCA1.pem`（変更なし） |
+
+#### metrics_publisher.py の設定
+
+冒頭の設定値を、AWS 側設定で取得した値に書き換えます。
 
 ```python
 ENDPOINT  = "xxxxxx-ats.iot.ap-northeast-1.amazonaws.com"  # 取得した Endpoint に書き換える
-DEVICE_ID = "raspi-001"  # 割り当てられた番号に書き換える
+DEVICE_ID = "raspi-001"  # 割り当てられた番号に合わせる（jawsug-<DEVICE_ID> が Thing 名）
 ```
 
-<!-- TODO(1.15): 以下を実機で確認して記述
-  - 証明書のリネームと配置（第2回と同じ 3 ファイル）
-  - scp での転送手順
-  - venv セットアップ（paho-mqtt, psutil のインストール）
-  - 実行と出力例（実際の標準出力を貼る）
-  - 並行実行の手段（SSH 2 セッション / tmux / nohup）
--->
+> ⚠️ `DEVICE_ID` は**スタックの `DeviceNumber` と一致させてください**。IoT ポリシーが接続元のクライアント ID とトピックを縛っているため、食い違うと接続または Publish が拒否されます。
+
+### ② Raspberry Pi へ転送（scp）
+
+まず **Raspberry Pi 側（SSH 先のターミナル）** で、転送先ディレクトリを作成します。
+
+```bash
+# Raspberry Pi 側で実行
+mkdir -p ~/session-03/certs
+```
+
+次に **PC 側**で、スクリプトと証明書を転送します。
+
+```bash
+# PC 側で実行（raspi.local は Raspberry Pi のホスト名。環境に合わせて変更）
+cd scripts/session-03
+scp metrics.py metrics_publisher.py load_gen.py show_metrics.sh jawsug-user@raspi.local:~/session-03/
+scp certs/* jawsug-user@raspi.local:~/session-03/certs/
+```
+
+転送後、Raspberry Pi 側は以下の構成になります。
+
+```
+~/session-03/
+├── metrics_publisher.py   # 送信スクリプト（メイン）
+├── metrics.py             # 取得・整形（publisher が読み込む）
+├── load_gen.py            # 負荷生成
+├── show_metrics.sh        # 実測値の表示
+└── certs/
+    ├── certificate.pem.crt
+    ├── private.pem.key
+    └── AmazonRootCA1.pem
+```
+
+### ③ Raspberry Pi 側でのセットアップ
+
+以降は **SSH で接続した Raspberry Pi 側** のターミナルで実行します。
+
+```bash
+cd ~/session-03
+python3 -m venv venv
+source venv/bin/activate
+pip install paho-mqtt psutil
+chmod +x show_metrics.sh
+```
+
+> 💡 最新の Raspberry Pi OS では `pip install` 実行時に `error: externally-managed-environment` が発生します。上記のように venv を使ってインストールしてください。
+
+時刻がずれているとメトリクスが正しい時刻に描画されないので、先に確認しておきます。
+
+```bash
+timedatectl
+```
+
+`System clock synchronized: yes` になっていれば OK です。
+
+### ④ 実行
+
+```bash
+cd ~/session-03
+source venv/bin/activate   # まだ venv に入っていない場合
+python3 metrics_publisher.py
+```
+
+🔎 出力例：
+
+```
+Connecting to xxxxxx-ats.iot.ap-northeast-1.amazonaws.com...
+  Topic: jawsug/session-03/raspi-001/metrics
+  Interval: 10s
+
+[OK] Connected to AWS IoT Core
+[SEND] 2026-08-13 14:30:10 JST cpu=12.4% memory=38.1%
+[SEND] 2026-08-13 14:30:20 JST cpu=11.8% memory=38.2%
+```
+
+**この画面はそのまま出しっぱなしにしておきます。** ここに表示されている値が、あとで CloudWatch のグラフと突き合わせる「送信値」になります。
+
+`Ctrl+C` で停止できます。
+
+> 💡 送信間隔を変えたい場合は `SEND_INTERVAL=5 python3 metrics_publisher.py` のように環境変数で指定できます。
 
 ---
 
-## 動作確認
+## 動作確認（CloudWatch でグラフを見る）
 
-> 🚧 **このセクションは骨格のみです**（タスク 2.7〜2.9 で確認して記述します）。
+### 1. メトリクスを探す
 
-<!-- TODO(2.7): メトリクスの到達確認
-  - CloudWatch → メトリクス → JAWSUG/IoTHandson を開く
-  - CpuUtilization-raspi-001 / MemoryUtilization-raspi-001 が現れることを確認
-  - 期間を 1 分に変更する操作を明示（重要）
--->
+1. マネジメントコンソール →（東京リージョン）→ **CloudWatch**
+2. 左メニュー「**メトリクス**」→「**すべてのメトリクス**」
+3. 「**カスタム名前空間**」に `JAWSUG/IoTHandson` が現れるので選択
 
-<!-- TODO(2.8): 負荷生成でグラフを動かす
-  - load_gen.py cpu --target 90 --duration 180
-  - 台形が視認できることをスクリーンショットで示す
-  - 期間 5 分と 1 分の見え方の違いも示す
--->
+> ⏱ 送信開始から**最大 3 分ほど**かかることがあります。表示されないときは少し待ってからブラウザを更新してください。
 
-<!-- TODO(2.9): 3 点セットの突き合わせ
-  - show_metrics.sh / publisher 出力 / CloudWatch の 3 値を比較
-  - 負荷開始から 1 分以上経過した定常区間で比較すること
--->
+4. 🔎 「**ディメンションなし**」を選択
+
+> ここで「ディメンションなし」になっているのは、学習内容で触れた `cloudwatchMetric` アクションの制約によるものです。だから**メトリクス名にデバイス名が入っています**。
+
+5. 自分のメトリクスにチェックを入れます。
+
+```
+CpuUtilization-raspi-001
+MemoryUtilization-raspi-001
+```
+
+### 2. 期間を 1 分に変更する（重要）
+
+グラフ右上の**期間**が既定で `5 分`になっています。これを **`1 分`** に変更してください。
+
+> ⚠️ **ここを変えないと、このあとの負荷の変化がグラフでほとんど見えません。** 5 分平均だと、3 分の負荷が平らに薄まってしまいます。
+
+「グラフ化したメトリクス」タブで、統計が「**平均**」になっていることも確認します。
+
+### 3. 負荷をかけてグラフを動かす
+
+**別の SSH ターミナル**を開いて（送信スクリプトは止めない）、CPU に負荷をかけます。
+
+```bash
+cd ~/session-03
+source venv/bin/activate
+python3 load_gen.py cpu --target 90 --duration 180
+```
+
+🔎 出力例：
+
+```
+[CPU LOAD] 目標: 90.0%  コア数: 4  duty: 0.90
+[CPU LOAD] 開始: 2026-08-13 14:35:00 JST
+[CPU LOAD] 終了予定: 2026-08-13 14:38:00 JST
+[CPU LOAD] 継続時間: 180秒
+
+  [  12s / 180s] CPU: 91.3%
+```
+
+1〜2 分待ってから CloudWatch のグラフを更新すると、**CPU 使用率が台形に立ち上がっている**のが見えます。負荷が終わると元に戻ります。
+
+> 💡 `--target` は「負荷生成が作る分」の目標値です。実測値は**もともと動いていた分（ベースライン）を含む**ため、目標より少し高く出ることがあります。
+
+メモリにも負荷をかけられます。
+
+```bash
+python3 load_gen.py memory --target 70 --duration 180
+```
+
+> ⚠️ メモリは**総容量の 85% を上限にクランプ**されます（超える指定をすると警告が出ます）。ラズパイが応答しなくなるのを防ぐためです。
+
+### 確認ポイント
+
+- 負荷をかけた時刻と、グラフが立ち上がった時刻が対応している
+- 平常時と負荷時で **30 ポイント以上**の差がある
+- 試しに期間を **5 分**に戻すと、同じ負荷でも山が低く見える（＝平均化されている）
 
 ---
 
 ## デバイス側での確認
-
-> 🚧 **このセクションは骨格のみです**（タスク 1.15 で実機の値を確認して記述します）。
 
 クラウド側のグラフだけを見ていると「本当にこの値が送られているのか」が分かりません。デバイス側でも実測値を確認し、両者を突き合わせます。
 
@@ -284,65 +530,210 @@ DEVICE_ID = "raspi-001"  # 割り当てられた番号に書き換える
 | `metrics_publisher.py` が送る値 / CloudWatch | `(total − available) / total × 100` |
 | `free` コマンドの `used` 列 | buff/cache を**除外**した使用量 |
 
-`free -m` を見るときは **`available` 列**に注目してください。`show_metrics.sh` を使うと、送信値と同じ定義の値に加えて `total` / `available` / `used` を並べて表示するので、違いが目で分かります。
+`free -m` を見るときは **`available` 列**に注目してください。送信値と同じ定義の値を見たいときは `show_metrics.sh` を使います。
 
-<!-- TODO(1.15): 以下を実機で確認して記述
-  - show_metrics.sh の実行結果（実際の出力を貼る）
-  - 「負荷をかける → デバイス側で確認 → CloudWatch で確認 → 突き合わせる」の流れ
-  - 4 者の値の比較表（実測値）
-  - 並行実行の手段
--->
+```bash
+cd ~/session-03
+./show_metrics.sh
+```
+
+🔎 出力例：
+
+```
+=== 2026-08-13 14:36:10 JST ===
+CPU    : 91.2 %   (全コア平均、/proc/stat から計算)
+Memory : 38.4 %   ((total - available) / total)
+  total=3792 MB  available=2336 MB  used(free コマンド表記)=1180 MB
+```
+
+### 値を突き合わせる
+
+**負荷をかけてから 1 分以上たった、値が安定している区間**で比べます。
+
+| 取得元 | 見る値 |
+|---|---|
+| ① `show_metrics.sh` | デバイス側の実測値 |
+| ② `metrics_publisher.py` の `[SEND]` 行 | 実際に送信した値 |
+| ③ CloudWatch（期間 1 分・平均） | クラウドに届いた値 |
+
+3 つが**おおむね一致**していれば、デバイスからクラウドまで値が素直に流れていることが確認できます。
+
+> 💡 負荷の立ち上がり・立ち下がりの瞬間は、1 分平均の影響でズレます。**安定区間で比べる**のがコツです。
+
+### 並行して作業する方法
+
+送信・負荷生成・確認を同時に動かすには、次のいずれかを使ってください。
+
+| 方法 | やり方 |
+|---|---|
+| SSH を複数開く（おすすめ） | ターミナルのタブを 2〜3 枚開いて、それぞれ `ssh` する |
+| `tmux` | `tmux` → `Ctrl+B` `"` で画面分割、`Ctrl+B` `o` で移動 |
+| バックグラウンド実行 | `nohup python3 metrics_publisher.py > publisher.log 2>&1 &` → `tail -f publisher.log` |
 
 ---
 
 ## Advanced Course1：様々な AWS サービスと連携する（Rules → Lambda）
 
-> ❌ **未着手**（タスク 3.5〜3.7）
+**Basic Course のリソースはそのまま使います。** 同じトピックを購読する 2 本目のルールを足して、Lambda を起動します。
 
-- CloudFormation テンプレート：[cfn/session-03/advanced-lambda.yaml](../../cfn/session-03/advanced-lambda.yaml)
-- スタック名：`jawsug-iot-handson-s3-lambda-001`
+### 1. スタックの作成
 
-<!-- TODO(3.5-3.7): スタック作成 → 送信 → Logs Insights でのクエリ確認 -->
+1. **CloudFormation** →「スタックの作成」→「新しいリソースを使用」
+2. [cfn/session-03/advanced-lambda.yaml](../../cfn/session-03/advanced-lambda.yaml) をアップロード
+3. スタック名：`jawsug-iot-handson-s3-lambda-001`
+4. パラメータ：`DeviceNumber` = `001`（Basic Course と同じ番号）
+5. 🔎 IAM リソース作成の承認にチェック →「送信」
+6. `CREATE_COMPLETE` を待つ
+
+### 2. 2 本目のルールを見てみる
+
+**IoT Core** →「メッセージのルーティング」→「ルール」を開くと、ルールが **2 本**になっています。
+
+| ルール | アクション | SQL |
+|---|---|---|
+| `jawsug_s3_metrics_to_cw_raspi_001` | CloudWatch メトリクス × 2 | `SELECT *` |
+| `jawsug_s3_metrics_to_lambda_raspi_001` | Lambda | `SELECT deviceId, cpu, memory, timestamp, topic() ...` |
+
+> **同じメッセージが 2 本のルールに届いています。** 学習内容で触れたとおり、Lambda アクションでは `SELECT` の出力がそのままイベントになるので、こちらは列を明示しています。
+
+### 3. ログを確認する
+
+送信スクリプトを動かしたまま、ログを見ます。
+
+1. **CloudWatch** →「**ロググループ**」→ `/aws/lambda/jawsug-s3-metrics-logger-raspi-001`
+2. 最新のログストリームを開く
+
+🔎 次のような JSON が 1 行ずつ出力されます。
+
+```json
+{"level":"INFO","event":"metrics_received","deviceId":"raspi-001","cpu":92.4,"memory":41.8,"timestamp":1786280400,"topic":"jawsug/session-03/raspi-001/metrics"}
+```
+
+### 4. Logs Insights で検索する
+
+1. **CloudWatch** →「**Logs Insights**」
+2. ロググループに `/aws/lambda/jawsug-s3-metrics-logger-raspi-001` を選択
+3. 次のクエリを貼って「**クエリの実行**」
+
+```
+fields @timestamp, deviceId, cpu, memory
+| filter event = "metrics_received"
+| sort @timestamp desc
+| limit 20
+```
+
+> 構造化ログ（JSON）で出力しておくと、こうしてフィールド名で検索・集計できます。`print` で文字列を並べるのではなく JSON で出す価値がここに出ます。
 
 ---
 
 ## Advanced Course2：自動連携する（Alarm → SNS → メール）
 
-> ❌ **未着手**（タスク 4.3〜4.6）
+CPU 使用率がしきい値を超えたら、自分のメールに通知が届くようにします。
 
-- CloudFormation テンプレート：[cfn/session-03/advanced-alarm.yaml](../../cfn/session-03/advanced-alarm.yaml)
-- スタック名：`jawsug-iot-handson-s3-alarm-001`
+> ⚠️ **順番が大切です。** スタックを作る → **メールを承認する** → 承認済みを確認する → **そのあとで**負荷をかけます。承認前に負荷をかけると、アラームは鳴っているのにメールが来ない状態になり、原因の切り分けに時間を取られます。
 
-> ⚠️ **順序が重要です**。スタック作成 → **確認メールを承認** → SNS でステータスが `Confirmed` になったことを確認 → **その後に**負荷生成でアラームを発火させてください。承認前はアラームが鳴ってもメールは届きません。
+### 1. スタックの作成
 
-<!-- TODO(4.3-4.6): 承認フローと発火確認の手順、企業メールのフィルタ注意（個人アドレス推奨） -->
+1. **CloudFormation** →「スタックの作成」→「新しいリソースを使用」
+2. [cfn/session-03/advanced-alarm.yaml](../../cfn/session-03/advanced-alarm.yaml) をアップロード
+3. スタック名：`jawsug-iot-handson-s3-alarm-001`
+4. パラメータを入力：
+
+| パラメータ | 値 |
+|---|---|
+| `DeviceNumber` | `001`（Basic Course と同じ番号） |
+| `MetricNamespace` | `JAWSUG/IoTHandson`（変更不要） |
+| `NotificationEmail` | **自分のメールアドレス** |
+| `CpuAlarmThreshold` | `80` |
+| `AlarmPeriodSeconds` | `60` |
+| `AlarmEvaluationPeriods` | `1` |
+| `EnableOkNotification` | `true`（復旧時にも通知する） |
+
+5. 「送信」
+
+> 💡 会社支給のメールはフィルタで止まることがあります。**フィルタの緩いアドレス（個人の Gmail など）**をおすすめします。
+
+### 2. 確認メールを承認する（必須）
+
+スタックを作成すると、**すぐに確認メールが届きます**。
+
+| 項目 | 内容 |
+|---|---|
+| 差出人 | `no-reply@sns.amazonaws.com` |
+| 件名 | `AWS Notification - Subscription Confirmation` |
+
+メール内の「**Confirm subscription**」リンクをクリックしてください。
+
+> ⚠️ **迷惑メールフォルダも確認してください。** ここでよく詰まります。
+
+> ⚠️ **CloudFormation は承認を待たずに `CREATE_COMPLETE` になります。** スタックが成功していても、承認していなければ通知は届きません。
+
+### 3. 承認できたか確認する
+
+1. マネジメントコンソール → **Amazon SNS** →「**サブスクリプション**」
+2. 自分のトピック `jawsug-s3-alarm-raspi-001` の行を見る
+3. **ステータスが `確認済み`（Confirmed）** になっていることを確認
+
+ここが `保留中の確認`（PendingConfirmation）のままなら、まだメールが届いていません。
+
+### 4. アラームを発火させる
+
+送信スクリプトを動かしたまま、負荷をかけます。
+
+```bash
+cd ~/session-03
+source venv/bin/activate
+python3 load_gen.py cpu --target 90 --duration 180
+```
+
+1. **CloudWatch** →「**アラーム**」→ `jawsug-s3-cpu-high-raspi-001`
+2. 状態が `OK` → `アラーム状態` に変わるのを待つ（**1〜3 分程度**）
+3. 「**履歴**」タブで状態遷移の記録を確認できます
+4. メールが届きます（🔎 数分以内）
+5. 負荷が終わると `OK` に戻り、復旧通知が届きます
+
+> 💡 送信スクリプトを止めている間にアラームが鳴らないよう、欠損データは「不足（notBreaching）」として扱う設定にしてあります。データが来ない＝異常ではない、という判断です。
 
 ---
 
 ## ハマりポイントと対処法
 
-> 🚧 現時点では**設計時に想定した項目**のみです。タスク 5.7 で M1〜M4 の実績を反映します。
-
 | 症状 | 原因 | 対処 |
 |---|---|---|
-| メトリクスが表示されない | グラフの期間が既定の 5 分のまま | 期間を 1 分に変更する |
-| メトリクスが表示されない | Raspberry Pi の時刻がずれている（CloudWatch は 2 時間以上未来／2 週間以上過去の時刻を拒否） | `timedatectl` で `System clock synchronized: yes` を確認 |
-| `free` の値と CloudWatch の値が合わない | 定義が違う（`used` は buff/cache を除外） | `available` 列を見る。`show_metrics.sh` で同一定義の値を確認 |
-| スタック作成が失敗する（ルール名） | IoT ルール名にハイフンは使えない（`[a-zA-Z0-9_]` のみ） | `DeviceNumber` は 3 桁数字で指定する |
-| メールが届かない | サブスクリプション未承認 | SNS コンソールでステータスが `Confirmed` か確認 |
+| メトリクスが表示されない | グラフの期間が既定の 5 分のまま | 期間を **1 分**に変更する |
+| メトリクスが表示されない | 送信からまだ時間が経っていない | 最大 3 分ほど待って更新する |
+| メトリクスが表示されない | ラズパイの時刻がずれている | `timedatectl` で `System clock synchronized: yes` を確認 |
+| メトリクスが見つからない | 「ディメンションなし」を開いていない | 名前空間 → **ディメンションなし** → メトリクス名で探す |
+| 接続できるが Publish が拒否される | 証明書にポリシーが未アタッチ | 証明書詳細 →「ポリシー」タブでアタッチを確認 |
+| 接続が拒否される | `DEVICE_ID` とスタックの `DeviceNumber` が食い違っている | ポリシーがクライアント ID を縛っている。両者を一致させる |
+| 証明書エラー | ファイル名・パスのミス | `certs/` の 3 ファイル名を確認（`certificate.pem.crt` / `private.pem.key` / `AmazonRootCA1.pem`） |
+| `ModuleNotFoundError: metrics` | `metrics.py` を転送していない | `metrics_publisher.py` と**セットで**転送する |
+| `error: externally-managed-environment` | venv を使っていない | `python3 -m venv venv && source venv/bin/activate` |
+| `free` の値と CloudWatch の値が合わない | 定義が違う（`used` は buff/cache を除外） | `available` 列を見る。`show_metrics.sh` で同じ定義の値を確認 |
+| スタック作成が失敗（ルール名） | `DeviceNumber` に数字以外を入れた | IoT ルール名はハイフン不可。**3 桁の数字**を指定する |
+| スタック作成が失敗（IAM） | IAM リソース作成の承認にチェックしていない | 確認画面のチェックボックスを入れて再実行 |
+| メールが届かない | サブスクリプション未承認 | SNS →サブスクリプションで `確認済み` か確認 |
 | メールが届かない | 迷惑メールフォルダに入っている | 差出人 `no-reply@sns.amazonaws.com` で検索 |
-| メールが届かない | スタックを再作成した | 再作成すると再承認が必要。前回承認済みでも届かない |
-| `pip install` が失敗する | `error: externally-managed-environment` | venv を作ってからインストールする |
-| 接続できるが Publish が拒否される | 証明書の有効化・ポリシー未アタッチ | 証明書タブでステータスとポリシーを確認 |
-| 証明書エラー | ファイル名・パスのミス | `certs/` の 3 ファイル名を確認 |
-
-<!-- TODO(5.7): M1〜M4 の実績を反映する -->
+| メールが届かない | スタックを作り直した | **再作成すると再承認が必要**。前回承認済みでも届かない |
+| グラフが平らなまま | 負荷の時間が短い | `--duration 180` 以上にする |
 
 ---
 
 ## 発展課題（時間が余ったら）
 
-Rules は今回扱った CloudWatch / Lambda / SNS 以外にも、多くのサービスへ連携できます。
+### SQL を書き換えてみる
+
+ルールの SQL に `WHERE` を足すと、条件に合うメッセージだけを流せます。
+
+```sql
+SELECT * FROM 'jawsug/session-03/+/metrics' WHERE cpu > 50
+```
+
+> IoT Core →ルール →「編集」から変更できます。閾値を超えたときだけ記録する、といった使い分けができます。
+
+### 他のサービスにつないでみる
+
+今回扱った CloudWatch / Lambda / SNS 以外にも、Rules は多くのサービスへ連携できます。
 
 | 連携先 | 用途の例 |
 |---|---|
@@ -352,21 +743,41 @@ Rules は今回扱った CloudWatch / Lambda / SNS 以外にも、多くのサ�
 | Timestream | 時系列データを分析する |
 | SQS | 後続処理をキューで疎結合にする |
 
-「アクションを差し替えるだけで連携先が変わる」ことを、今回の 2 本のルールで体験できたはずです。
+**アクションを差し替えるだけで連携先が変わる**ことを、今回の 2 本のルールで体験できたはずです。
 
 ---
 
 ## 後片付け
 
-> 🚧 **未検証**（タスク 5.8）
+ハンズオン終了後は、作成した AWS リソースを削除してください。
+
+### スクリプトで削除する
 
 ```bash
 cd scripts/session-03
 DEVICE_NUMBER=001 bash teardown.sh
 ```
 
-削除対象を表示して確認を求めたうえで、証明書 → Advanced Course2 → Advanced Course1 → Basic Course のスタック → ローカル `certs/` の順に削除し、最後に残存確認の結果を表示します。
+削除対象の一覧が表示され、`y` を入力すると次の順で削除されます。
 
-> 💡 **CloudWatch Metrics（カスタムメトリクス）には削除 API がありません**。保持期間の経過で自動的に消えます。課金対象の CloudWatch Alarm はスタック削除で消えるので、後片付けを実行すれば月額課金は止まります。
+1. 証明書（デタッチ →無効化 →削除）
+2. CloudFormation スタック（Advanced Course2 → Advanced Course1 → Basic Course の順）
+3. ローカルの `certs/` ディレクトリ
+4. 残存リソースの確認結果を表示
 
 > 💡 実行前に `aws sts get-caller-identity` で AWS 認証が通っているか確認してください。
+
+### コンソールで削除する
+
+CLI を使わない場合は、次の順に削除します。
+
+1. **IoT Core** →モノ → `jawsug-raspi-001` →「証明書」タブ →証明書を選択 →「アクション」→「**デタッチ**」
+2. 同じ証明書を「アクション」→「**無効化**」→「**削除**」
+3. **CloudFormation** →スタックを選択 →「削除」
+   - `jawsug-iot-handson-s3-alarm-001`
+   - `jawsug-iot-handson-s3-lambda-001`
+   - `jawsug-iot-handson-s3-001`
+
+> ⚠️ **証明書を先に外してください。** 証明書がアタッチされたままだと、モノやポリシーの削除でスタック削除が失敗します。
+
+> 💡 **CloudWatch のカスタムメトリクスには削除 API がありません。** 保持期間の経過で自動的に消えます（送信を止めると 3 時間ほどで一覧から消え、データは 15 日後に期限切れ）。課金対象の CloudWatch アラームはスタック削除で消えるので、後片付けをすれば月額課金は止まります。
