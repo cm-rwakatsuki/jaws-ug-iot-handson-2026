@@ -8,7 +8,7 @@ JAWS-UG IoT 専門支部 IoT Core ハンズオン（全3回）のハンズオン
 |---|---|---|
 | 第1回 | デバイスを AWS IoT Core に接続し、MQTT で温度データを送信してみよう | [イベントページ](https://jawsug-iot.connpass.com/event/391519/) |
 | 第2回 | Device Shadow を使ってクラウドからデバイスを制御してみよう（Lチカ） | [イベントページ](https://jawsug-iot.connpass.com/event/397773/) |
-| 第3回 | IoT Rules Engine で他の AWS サービスと連携し、データを自動処理・分析してみよう | T.B.D. |
+| 第3回 | IoT Rules Engine で他の AWS サービスと連携し、データを自動処理・分析してみよう | [イベントページ](https://jawsug-iot.connpass.com/event/402082/) |
 
 ## ディレクトリ構成
 

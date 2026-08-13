@@ -2,6 +2,10 @@
 # 実施日時: 2026-08-14 02:53:39 JST
 # 前提: Basic / Advanced Course1 / Advanced Course2 の 3 スタックが CREATE_COMPLETE
 # 修正後の teardown.sh（F-3d / F-3e / F-3f 対応済み）での検証
+# 注記（2026-08-14）: 実施時点の末尾には CloudWatch Metrics が「3 時間後に一覧から消え、
+# 15 日後に期限切れ」と表示されていたが、AWS 公式仕様との不一致が判明したため訂正済み。
+# 正しくは、2 週間データポイントがなければコンソール等の一覧から非表示となり、
+# データ自体は解像度を下げながら最長 15 か月保持される。
 
 === JAWS-UG IoT Handson 第3回 - 後片付け ===
 Device Number: 001
