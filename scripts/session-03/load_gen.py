@@ -10,7 +10,6 @@ CloudWatch のグラフに反映されることを体感するためのツール
 """
 
 import argparse
-import ctypes
 import multiprocessing
 import os
 import signal
@@ -40,11 +39,13 @@ def validate_cpu_target(target: float) -> float:
     return float(target)
 
 
-def validate_memory_target(target_mb: float, total_mb: float) -> float:
-    """メモリ目標を検証し、安全上限にクランプする。
+def validate_memory_target(
+    target_mb: float, total_mb: float, used_mb: float = 0.0
+) -> float:
+    """追加確保量を検証し、確保後の総使用量が安全上限内になるようクランプする。
 
     Returns:
-        安全上限以内に丸められた MB 値
+        安全に追加確保できる MB 値
 
     Raises:
         ValueError: target_mb が負の場合
@@ -52,14 +53,15 @@ def validate_memory_target(target_mb: float, total_mb: float) -> float:
     if target_mb <= 0:
         raise ValueError(f"メモリ目標は正の値で指定してください: {target_mb}")
 
-    max_mb = total_mb * MEMORY_SAFETY_RATIO
-    if target_mb > max_mb:
+    max_alloc_mb = max(0.0, total_mb * MEMORY_SAFETY_RATIO - used_mb)
+    if target_mb > max_alloc_mb:
         print(
-            f"[WARN] 要求 {target_mb:.0f} MB は安全上限 {max_mb:.0f} MB "
-            f"(総容量 {total_mb:.0f} MB の {MEMORY_SAFETY_RATIO*100:.0f}%) を超えています。"
-            f"上限値にクランプします。"
+            f"[WARN] 要求 {target_mb:.0f} MB を追加すると、メモリ総使用量が安全上限 "
+            f"{total_mb * MEMORY_SAFETY_RATIO:.0f} MB "
+            f"(総容量 {total_mb:.0f} MB の {MEMORY_SAFETY_RATIO*100:.0f}%) を超えます。"
+            f"追加確保量を {max_alloc_mb:.0f} MB にクランプします。"
         )
-        return max_mb
+        return max_alloc_mb
     return target_mb
 
 
@@ -75,9 +77,30 @@ def calculate_duty_cycle(target_percent: float, cpu_count: int) -> float:
     return min(1.0, max(0.0, duty))
 
 
-def memory_percent_to_mb(target_percent: float, total_mb: float) -> float:
-    """目標パーセントから確保すべき MB 数を計算する。"""
-    return total_mb * target_percent / 100.0
+def memory_percent_to_mb(
+    target_percent: float, total_mb: float, used_mb: float = 0.0
+) -> float:
+    """最終的な目標使用率から追加確保すべき MB 数を計算する。
+
+    目標は安全上限（総容量の 85%）にクランプし、現在使用中のメモリを
+    差し引いた分だけを返す。すでに目標以上なら 0 MB を返す。
+    """
+    if not isinstance(target_percent, (int, float)):
+        raise ValueError(f"メモリ目標は数値で指定してください: {target_percent!r}")
+    if target_percent <= 0 or target_percent > 100:
+        raise ValueError(
+            f"メモリ目標は 0 より大きく 100 以下で指定してください: {target_percent}"
+        )
+
+    safe_percent = min(float(target_percent), MEMORY_SAFETY_RATIO * 100)
+    if target_percent > safe_percent:
+        print(
+            f"[WARN] 目標 {target_percent:.0f}% は安全上限 "
+            f"{safe_percent:.0f}% を超えています。上限値にクランプします。"
+        )
+
+    target_used_mb = total_mb * safe_percent / 100.0
+    return max(0.0, target_used_mb - used_mb)
 
 
 # ============================================================
@@ -194,8 +217,17 @@ def run_cpu_load(target: float, duration: int):
 
 def run_memory_load(target_mb: float, duration: int):
     """メモリ負荷を生成する。"""
-    total_mb = psutil.virtual_memory().total / (1024 * 1024)
-    target_mb = validate_memory_target(target_mb, total_mb)
+    mem = psutil.virtual_memory()
+    total_mb = mem.total / (1024 * 1024)
+    used_mb = (mem.total - mem.available) / (1024 * 1024)
+    target_mb = validate_memory_target(target_mb, total_mb, used_mb)
+
+    if target_mb <= 0:
+        print(
+            "[MEMORY LOAD] 現在のメモリ使用量が安全上限に達しているため、"
+            "追加確保せず終了します。"
+        )
+        return
 
     start_time = time.time()
     end_time = start_time + duration
@@ -273,7 +305,9 @@ def main():
     # Memory サブコマンド
     mem_parser = subparsers.add_parser("memory", help="メモリ負荷を生成")
     mem_group = mem_parser.add_mutually_exclusive_group(required=True)
-    mem_group.add_argument("--target", type=float, help="目標メモリ使用率（%%）")
+    mem_group.add_argument(
+        "--target", type=float, help="実行後の目標メモリ使用率（%%）"
+    )
     mem_group.add_argument("--mb", type=float, help="確保容量（MB）")
     mem_parser.add_argument(
         "--duration", type=int, default=180, help="継続時間（秒）（既定: 180）"
@@ -288,11 +322,20 @@ def main():
     if args.mode == "cpu":
         run_cpu_load(args.target, args.duration)
     elif args.mode == "memory":
-        total_mb = psutil.virtual_memory().total / (1024 * 1024)
-        if args.mb:
+        mem = psutil.virtual_memory()
+        total_mb = mem.total / (1024 * 1024)
+        used_mb = (mem.total - mem.available) / (1024 * 1024)
+        if args.mb is not None:
             target_mb = args.mb
         else:
-            target_mb = memory_percent_to_mb(args.target, total_mb)
+            target_mb = memory_percent_to_mb(args.target, total_mb, used_mb)
+            if target_mb <= 0:
+                print(
+                    f"[MEMORY LOAD] 現在の使用率 {mem.percent:.1f}% は目標 "
+                    f"{min(args.target, MEMORY_SAFETY_RATIO * 100):.1f}% "
+                    "以上のため、追加確保は不要です。"
+                )
+                return
         run_memory_load(target_mb, args.duration)
 
 

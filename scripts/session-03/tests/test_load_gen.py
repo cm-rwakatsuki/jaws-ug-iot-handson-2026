@@ -25,6 +25,7 @@ from load_gen import (
     memory_percent_to_mb,
     format_jst,
     cpu_worker,
+    main,
     MEMORY_SAFETY_RATIO,
 )
 
@@ -85,11 +86,12 @@ class TestValidateMemoryTarget:
         assert result == 2000
 
     def test_exceeds_limit_clamped(self, capsys):
-        """安全上限を超える場合にクランプされる。"""
+        """確保後の総使用量が安全上限を超える場合にクランプされる。"""
         total_mb = 4096
-        max_mb = total_mb * MEMORY_SAFETY_RATIO
-        result = validate_memory_target(4000, total_mb)
-        assert result == max_mb
+        used_mb = 1024
+        max_alloc_mb = total_mb * MEMORY_SAFETY_RATIO - used_mb
+        result = validate_memory_target(3000, total_mb, used_mb)
+        assert result == max_alloc_mb
         captured = capsys.readouterr()
         assert "[WARN]" in captured.out
 
@@ -106,9 +108,16 @@ class TestValidateMemoryTarget:
     def test_exactly_at_limit(self):
         """ちょうど安全上限の場合はクランプしない。"""
         total_mb = 4096
-        max_mb = total_mb * MEMORY_SAFETY_RATIO
-        result = validate_memory_target(max_mb, total_mb)
-        assert result == max_mb
+        used_mb = 1024
+        max_alloc_mb = total_mb * MEMORY_SAFETY_RATIO - used_mb
+        result = validate_memory_target(max_alloc_mb, total_mb, used_mb)
+        assert result == max_alloc_mb
+
+    def test_no_safe_capacity_returns_zero(self, capsys):
+        """現在使用量が安全上限以上なら追加確保量は 0。"""
+        result = validate_memory_target(128, 4096, 3600)
+        assert result == 0.0
+        assert "[WARN]" in capsys.readouterr().out
 
 
 # ============================================================
@@ -147,19 +156,92 @@ class TestCalculateDutyCycle:
 
 
 class TestMemoryPercentToMb:
-    """% → MB 変換のテスト。"""
+    """最終目標使用率から追加確保量への変換テスト。"""
 
     def test_50_percent_of_4096(self):
-        """50% of 4096 MB = 2048 MB。"""
-        assert memory_percent_to_mb(50, 4096) == 2048.0
+        """現在25%使用中なら、50%到達に必要な追加量は25%。"""
+        assert memory_percent_to_mb(50, 4096, 1024) == 1024.0
 
-    def test_100_percent(self):
-        """100% = total。"""
-        assert memory_percent_to_mb(100, 4096) == 4096.0
+    def test_target_70_percent_subtracts_current_usage(self):
+        """現在30%使用中の --target 70 は40%分だけ追加確保する。"""
+        total_mb = 2048
+        used_mb = total_mb * 0.30
+        assert memory_percent_to_mb(70, total_mb, used_mb) == pytest.approx(
+            total_mb * 0.40
+        )
 
-    def test_0_percent(self):
-        """0% = 0。"""
-        assert memory_percent_to_mb(0, 4096) == 0.0
+    def test_already_above_target_returns_zero(self):
+        """現在使用率が目標以上なら追加確保しない。"""
+        assert memory_percent_to_mb(50, 4096, 2457.6) == 0.0
+
+    def test_target_above_safety_limit_is_clamped(self, capsys):
+        """85%を超える最終目標は85%へクランプする。"""
+        total_mb = 4096
+        used_mb = 1024
+        result = memory_percent_to_mb(100, total_mb, used_mb)
+        assert result == pytest.approx(total_mb * MEMORY_SAFETY_RATIO - used_mb)
+        assert "[WARN]" in capsys.readouterr().out
+
+    @pytest.mark.parametrize("target", [0, -1, 101])
+    def test_invalid_percent_raises(self, target):
+        """0以下または100超の目標値は拒否する。"""
+        with pytest.raises(ValueError):
+            memory_percent_to_mb(target, 4096, 1024)
+
+
+# ============================================================
+# memory CLI の追加確保量計算
+# ============================================================
+
+
+class TestMemoryCli:
+    """--target が最終使用率として run_memory_load へ渡されること。"""
+
+    @patch("load_gen.run_memory_load")
+    @patch("load_gen.psutil.virtual_memory")
+    def test_target_subtracts_current_usage(self, mock_virtual_memory, mock_run):
+        """2GB・使用率30%で目標70%なら、40%分だけ追加確保する。"""
+        total_bytes = 2048 * 1024 * 1024
+        mock_virtual_memory.return_value = MagicMock(
+            total=total_bytes,
+            available=total_bytes * 0.70,
+            percent=30.0,
+        )
+
+        with patch.object(
+            sys,
+            "argv",
+            ["load_gen.py", "memory", "--target", "70", "--duration", "180"],
+        ):
+            main()
+
+        mock_run.assert_called_once()
+        allocation_mb, duration = mock_run.call_args.args
+        assert allocation_mb == pytest.approx(2048 * 0.40)
+        assert duration == 180
+
+    @patch("load_gen.run_memory_load")
+    @patch("load_gen.psutil.virtual_memory")
+    def test_target_at_or_below_current_usage_skips_allocation(
+        self, mock_virtual_memory, mock_run, capsys
+    ):
+        """現在使用率が目標以上なら追加確保処理を呼ばない。"""
+        total_bytes = 2048 * 1024 * 1024
+        mock_virtual_memory.return_value = MagicMock(
+            total=total_bytes,
+            available=total_bytes * 0.40,
+            percent=60.0,
+        )
+
+        with patch.object(
+            sys,
+            "argv",
+            ["load_gen.py", "memory", "--target", "50", "--duration", "180"],
+        ):
+            main()
+
+        mock_run.assert_not_called()
+        assert "追加確保は不要" in capsys.readouterr().out
 
 
 # ============================================================
