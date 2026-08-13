@@ -1,0 +1,17 @@
+# F-13 Red: 実 IoT エンドポイントの混入検出
+# 実施日時: 2026-08-14 02:23 JST
+
+>       assert not real, (
+            f"{rel_path} に実際の IoT エンドポイントらしき値が含まれています。\n"
+            f"  検出: {[r[:4] + '...' for r in real]}\n"
+            "  プレースホルダ（xxxxxx-ats.iot....）に戻すか、環境変数で渡してください"
+        )
+E       AssertionError: scripts/session-03/metrics_publisher.py に実際の IoT エンドポイントらしき値が含まれています。
+E           検出: ['a1xp...']
+E           プレースホルダ（xxxxxx-ats.iot....）に戻すか、環境変数で渡してください
+E       assert not ['<REDACTED>']
+
+tests/test_no_secrets.py:56: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_no_secrets.py::test_endpoint_is_placeholder[scripts/session-03/metrics_publisher.py]
+========================= 1 failed, 6 passed in 0.09s ==========================

@@ -40,6 +40,7 @@
 | 証明書 ID / ARN | `<CERT_ID>` |
 | 参加者・検証者のメールアドレス | `<EMAIL>` |
 | アクセスキー・トークン類 | そもそも記録しない |
+| ローカルの絶対パス（ユーザー名を含む） | `<HOME>`（`pytest` の `rootdir` 行などに現れる） |
 
 スクリーンショットは該当箇所を塗りつぶす。`5.11` でマスキング漏れの最終確認を行う。
 
@@ -1546,6 +1547,8 @@ git ls-files | grep -i "certs/" || echo "certs は未コミット"
 | **2026-08-10** | **F-1 修正（M2-F1）** | `cfn/session-03/iot-rules-cloudwatch.yaml`、`spec/design.md` 3.1・3.4・5.3 節、`docs/session-03/handson.md`、`scripts/session-03/teardown.sh`、`tests/test_templates.py` | **上記 F-1 の指摘を解消**。`RuleErrorLogGroup` を `/aws/iot/session-03/rule-errors-raspi-${DeviceNumber}` に変更し、`design.md` の命名規約を実態に合わせて更新（「すべての明示的なリソース名にデバイス番号を含める」旨の注記を追加）。再発防止として `TestResourceNameIsolation` を追加し、3 テンプレートの全名前プロパティを機械的に検証。**本件は R7-1（Red → Green）を遵守**し、Red の失敗ログを `evidence/m2/F-1-red.txt` に保存 |
 | 2026-08-10 | F-1 の副産物 | `scripts/session-03/teardown.sh` | 残存確認にロググループ 3 件のチェックを追加（F-3b 解消）。`read -r`（shellcheck SC2162）を修正。`teardown.sh` / `show_metrics.sh` ともに shellcheck 指摘 0 件 |
 | **2026-08-13** | **構成図レビュー指摘（タスク 5.1）** | `docs/session-03/architecture.drawio`（新規）、`docs/session-03/handson.md` | 当初 SVG を手書きで生成してプロセス図（データフロー）にしていたが、レビューで **「Deployment 図にすべき。どの AWS サービスを利用しているか分からない」**「AWS 公式アイコンを使うこと」と指摘。方針を変更し、①図の種類を Deployment 図へ、②**破線枠 = CloudFormation スタック**でデプロイ単位を表現、③AWS 公式アイコン（draw.io 内蔵 `mxgraph.aws4`）を使用、④SVG 手書きをやめて **`.drawio` を成果物**とし SVG は draw.io から書き出す方式に変更。手書き SVG（`architecture.drawio.svg`）は削除した |
+| **2026-08-14** | **機微情報の点検（F-13）** | `scripts/session-03/metrics_publisher.py`、`tests/test_no_secrets.py`（新規）、`evidence/*`、`verification-log.md` 1.3 節 | リポジトリ全体（作業ツリー 65 ファイル ＋ 全 33 コミット）を走査。**実 IoT エンドポイントが `f5c9ddc` でコミットされ公開リポジトリに push されていた**ことを検出。原因は手順書の「スクリプト冒頭の設定値を書き換える」方式（第1回・第2回からの踏襲）。**秘密鍵・証明書・アクセスキー・アカウント ID・個人メールアドレスの混入は履歴を含めてゼロ**であることも確認。対応：①プレースホルダに戻す ②`AWS_IOT_ENDPOINT` / `DEVICE_ID` の**環境変数対応を追加**（ファイルを書き換えずに動かせるようにし再発を防ぐ）③`test_no_secrets.py` を追加（**Red → Green 遵守**。7 件）④`evidence/` のローカル絶対パスを `<HOME>` にマスクし、1.3 節のマスキング規則に追記 |
+| 2026-08-14 | 同上（残課題） | （オーナー判断待ち） | **git 履歴には実エンドポイントが残っている**（`f5c9ddc`、`origin/feature/session-03` に push 済み）。IoT エンドポイントは認証情報ではなく証明書なしでは接続できないため実害は小さいが、アカウント固有の識別子である。履歴書き換え（`git filter-repo` ＋ force push）は破壊的操作のため実施していない |
 | **2026-08-14** | **ウォークスルーでの発見（ログ分析／Log Analytics の新 UI）** | `docs/session-03/handson.md` | Logs Insights が「**ログ分析**」に統合され UI が変わっていた。①初回アクセス時に「**新しい Log Analytics エクスペリエンスへようこそ**」の案内が出る（Logs Insights / Live Tail / Contributor Insights の統合）。②**ロググループを選ぶとエディタ 1 行目に `SOURCE "arn:..." START=-604800s END=0s \|` が自動挿入される** — 手順書は「クエリを貼って実行」としか書いておらず、参加者が「余計な行がある」と消してしまう恐れがあった。③実行ボタンの名称は「**クエリの実行**」ではなく「**実行**」。以上 3 点を手順書に反映し、エディタ全体の見え方も例示した |
 | 2026-08-14 | 同上（結果の確認） | （記録のみ） | クエリ結果が `@timestamp` / `deviceId` / `cpu` / `memory` の列として表示され、**構造化ログ（JSON）がフィールドとして検索できる**ことを実証（R4-6）。タイムスタンプは `+09:00` 表記で JST 表示。**Advanced Course1 の検証はこれで完了** |
 | **2026-08-13** | **ウォークスルーでの発見（メトリクス画面の表記と期間設定）** | `docs/session-03/handson.md` | ①正確なラベルは「**ディメンションなしのメトリクス**」（私の記述は「ディメンションなし」で不正確）。②**「期間」の設定場所を誤記していた**：右上の `⟳ 1 分` は**グラフの自動更新間隔**であり、メトリクスの集計期間ではない。期間は「**グラフ化したメトリクス**」タブの「期間」列で変更する。**どちらも「1 分」と表示されるため混同しやすく**、参加者が「期間を変えたのにグラフが変わらない」と詰まる典型パターン。手順書とハマりポイント表の両方に反映 |

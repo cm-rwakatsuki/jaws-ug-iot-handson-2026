@@ -3,9 +3,9 @@
 # 期待: 基本テンプレートの RuleErrorLogGroup が DeviceNumber を含まないため失敗する
 
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03/.venv/bin/python3
+platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- <HOME>/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03/.venv/bin/python3
 cachedir: .pytest_cache
-rootdir: /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
+rootdir: <HOME>/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
 configfile: pytest.ini
 collecting ... collected 3 items
 
@@ -17,7 +17,7 @@ tests/test_templates.py::TestResourceNameIsolation::test_all_resource_names_incl
 _ TestResourceNameIsolation.test_all_resource_names_include_device_number[basic] _
 
 self = <tests.test_templates.TestResourceNameIsolation object at 0x10627c0d0>
-template_path = PosixPath('/Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/cfn/session-03/iot-rules-cloudwatch.yaml')
+template_path = PosixPath('<HOME>/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/cfn/session-03/iot-rules-cloudwatch.yaml')
 
     @pytest.mark.parametrize(
         "template_path",

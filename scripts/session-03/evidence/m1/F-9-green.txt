@@ -2,7 +2,7 @@
 # 実施日時: 2026-08-13 21:16 JST
 
 $ pytest tests/test_load_gen.py::TestCpuWorkerSignalHandling -v
-rootdir: /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
+rootdir: <HOME>/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
 configfile: pytest.ini
 collecting ... collected 2 items
 

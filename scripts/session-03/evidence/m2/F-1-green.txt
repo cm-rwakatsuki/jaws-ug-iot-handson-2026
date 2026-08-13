@@ -4,9 +4,9 @@
 
 $ pytest tests/test_templates.py::TestResourceNameIsolation -v
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03/.venv/bin/python3
+platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- <HOME>/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03/.venv/bin/python3
 cachedir: .pytest_cache
-rootdir: /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
+rootdir: <HOME>/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
 configfile: pytest.ini
 collecting ... collected 3 items
 

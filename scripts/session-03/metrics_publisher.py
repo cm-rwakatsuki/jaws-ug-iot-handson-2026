@@ -21,8 +21,13 @@ from metrics import (
 )
 
 # ---- 設定（参加者が書き換える） ----
-ENDPOINT = "xxxxxx-ats.iot.ap-northeast-1.amazonaws.com"  # 取得した Endpoint に書き換える
-DEVICE_ID = "raspi-001"  # 割り当てられた番号に書き換える（jawsug-raspi-001 の raspi-001 部分）
+# 環境変数が設定されていればそちらを優先する。
+# ファイルを書き換えずに動かしたいとき（実値をコミットしたくないとき）に使う。
+#   例: AWS_IOT_ENDPOINT=xxxx-ats.iot.ap-northeast-1.amazonaws.com python3 metrics_publisher.py
+ENDPOINT = os.environ.get(
+    "AWS_IOT_ENDPOINT", "xxxxxx-ats.iot.ap-northeast-1.amazonaws.com"
+)  # 取得した Endpoint に書き換える
+DEVICE_ID = os.environ.get("DEVICE_ID", "raspi-001")  # 割り当てられた番号に書き換える
 # ----------------------------------
 
 SEND_INTERVAL = int(os.environ.get("SEND_INTERVAL", "10"))  # 秒（R1-2）
