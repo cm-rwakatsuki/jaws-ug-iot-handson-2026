@@ -13,12 +13,12 @@ Parameters:
     Default: "001"
     AllowedPattern: "^[0-9]{3}$"
     ConstraintDescription: "3桁の数字を入力してください（例: 001）"
-    Description: "デバイス番号（3桁数字）。リソース名の一部として使用されます。"
+    Description: "Device number (3-digit number). Used as part of the resource name."
 
   MetricNamespace:
     Type: String
     Default: "JAWSUG/IoTHandson"
-    Description: "CloudWatch Metrics の名前空間"
+    Description: "CloudWatch Metrics namespace"
 
 # ------------------------------------------------------------
 # リソース

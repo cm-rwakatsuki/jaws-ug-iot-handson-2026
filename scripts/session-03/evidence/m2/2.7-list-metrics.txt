@@ -1,0 +1,10 @@
+# M2-2 メトリクスの到達確認（タスク 2.7）
+# 実施日時: 2026-08-13 21:00〜21:10 JST
+# 送信元: 実機 Raspberry Pi（4 コア）
+
+$ aws cloudwatch list-metrics --namespace JAWSUG/IoTHandson
+  CpuUtilization-raspi-001  Dimensions=(なし)
+  MemoryUtilization-raspi-001  Dimensions=(なし)
+
+$ aws logs describe-log-streams --log-group-name /aws/iot/session-03/rule-errors-raspi-001
+  ログストリーム数: 0（0 = アクション失敗なし）

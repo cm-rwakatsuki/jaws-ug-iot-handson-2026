@@ -8,6 +8,7 @@
 - クリーンアップ / 時刻表示（モック）
 """
 
+import signal
 import sys
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -23,6 +24,7 @@ from load_gen import (
     calculate_duty_cycle,
     memory_percent_to_mb,
     format_jst,
+    cpu_worker,
     MEMORY_SAFETY_RATIO,
 )
 
@@ -158,6 +160,55 @@ class TestMemoryPercentToMb:
     def test_0_percent(self):
         """0% = 0。"""
         assert memory_percent_to_mb(0, 4096) == 0.0
+
+
+# ============================================================
+# cpu_worker のシグナルハンドラ（R2-5 / 実機で発見した不具合の再発防止）
+# ============================================================
+
+
+class TestCpuWorkerSignalHandling:
+    """ワーカーが親のシグナルハンドラを引き継がないこと。
+
+    `multiprocessing` の fork では子が親のシグナルハンドラを継承する。
+    継承したままだと親の `terminate()`（SIGTERM）で親用のクリーンアップが
+    子プロセス内で走り、`Process.is_alive()` が
+    `AssertionError: can only test a child process` を投げて
+    大量のトレースバックが出る（2026-08-13 に実機で発生）。
+    """
+
+    @patch("load_gen.signal.signal")
+    def test_worker_resets_inherited_signal_handlers(self, mock_signal):
+        """ワーカーの先頭で SIGINT / SIGTERM を親から切り離すこと。"""
+        stop_event = MagicMock()
+        stop_event.is_set.return_value = True  # ループに入らず即終了させる
+
+        cpu_worker(0.5, stop_event)
+
+        handled = {c.args[0] for c in mock_signal.call_args_list if c.args}
+        assert signal.SIGINT in handled, (
+            "ワーカーが SIGINT のハンドラを解除していません。"
+            "親のハンドラを継承したままだとトレースバックが出ます"
+        )
+        assert signal.SIGTERM in handled, (
+            "ワーカーが SIGTERM のハンドラを解除していません"
+        )
+
+    @patch("load_gen.signal.signal")
+    def test_worker_does_not_use_parent_cleanup(self, mock_signal):
+        """解除先が親のハンドラ関数ではなく既定動作／無視であること。"""
+        stop_event = MagicMock()
+        stop_event.is_set.return_value = True
+
+        cpu_worker(0.5, stop_event)
+
+        for call in mock_signal.call_args_list:
+            if not call.args:
+                continue
+            handler = call.args[1]
+            assert handler in (signal.SIG_DFL, signal.SIG_IGN), (
+                f"ワーカーのハンドラは SIG_DFL / SIG_IGN にすべきです: {handler}"
+            )
 
 
 # ============================================================

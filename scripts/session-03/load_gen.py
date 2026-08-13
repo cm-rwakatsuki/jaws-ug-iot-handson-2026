@@ -87,6 +87,15 @@ def memory_percent_to_mb(target_percent: float, total_mb: float) -> float:
 
 def cpu_worker(duty: float, stop_event):
     """CPU 負荷ワーカー。duty cycle 制御で目標使用率に近づける。"""
+    # 親から継承したシグナルハンドラを解除する。
+    # multiprocessing の fork では子が親のハンドラを継承するため、
+    # 親が terminate()（SIGTERM）を送ると親用のクリーンアップ処理が
+    # 子プロセス内で動き、Process.is_alive() が
+    # 「AssertionError: can only test a child process」を投げる。
+    # 子は素直に終了させたいので既定動作へ戻す。
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
     cycle_time = 0.1  # 100ms サイクル
     busy_time = cycle_time * duty
     sleep_time = cycle_time * (1 - duty)
@@ -129,27 +138,44 @@ def run_cpu_load(target: float, duration: int):
 
     stop_event = multiprocessing.Event()
     workers = []
+    main_pid = os.getpid()
+    released = False
 
-    def cleanup(signum=None, frame=None):
+    def release():
+        """ワーカーを停止して終了メッセージを出す。
+
+        シグナル経路と finally の両方から呼ばれるため冪等にする。
+        子プロセスから呼ばれた場合は何もしない（保険。ワーカー側でも
+        ハンドラを解除しているので通常ここには来ない）。
+        """
+        nonlocal released
+        if released or os.getpid() != main_pid:
+            return
+        released = True
+
         stop_event.set()
         for w in workers:
             if w.is_alive():
                 w.terminate()
         for w in workers:
             w.join(timeout=3)
-        actual_end = time.time()
-        print(f"\n[CPU LOAD] 実終了: {format_jst(actual_end)}")
-        if signum is not None:
-            sys.exit(0)
 
-    signal.signal(signal.SIGINT, cleanup)
-    signal.signal(signal.SIGTERM, cleanup)
+        print(f"\n[CPU LOAD] 実終了: {format_jst(time.time())}")
+        print("[CPU LOAD] 完了。負荷を解放しました。")
+
+    def on_signal(signum, frame):
+        release()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, on_signal)
+    signal.signal(signal.SIGTERM, on_signal)
 
     try:
         # ワーカー起動
         for _ in range(cpu_count):
-            w = multiprocessing.Process(target=cpu_worker, args=(duty, stop_event))
-            w.daemon = True
+            w = multiprocessing.Process(
+                target=cpu_worker, args=(duty, stop_event), daemon=True
+            )
             w.start()
             workers.append(w)
 
@@ -161,20 +187,9 @@ def run_cpu_load(target: float, duration: int):
                 f"  [{elapsed:>4d}s / {duration}s] CPU: {current_cpu:.1f}%",
                 end="\r",
             )
-            if time.time() >= end_time:
-                break
 
     finally:
-        stop_event.set()
-        for w in workers:
-            if w.is_alive():
-                w.terminate()
-        for w in workers:
-            w.join(timeout=3)
-
-    actual_end = time.time()
-    print(f"\n[CPU LOAD] 実終了: {format_jst(actual_end)}")
-    print("[CPU LOAD] 完了。負荷を解放しました。")
+        release()
 
 
 def run_memory_load(target_mb: float, duration: int):
@@ -192,17 +207,24 @@ def run_memory_load(target_mb: float, duration: int):
     print()
 
     buffer = None
+    released = False
 
-    def cleanup(signum=None, frame=None):
-        nonlocal buffer
+    def release():
+        """確保したメモリを解放して終了メッセージを出す（冪等）。"""
+        nonlocal buffer, released
+        if released:
+            return
+        released = True
         buffer = None  # GC に任せる
-        actual_end = time.time()
-        print(f"\n[MEMORY LOAD] 実終了: {format_jst(actual_end)}")
-        if signum is not None:
-            sys.exit(0)
+        print(f"\n[MEMORY LOAD] 実終了: {format_jst(time.time())}")
+        print("[MEMORY LOAD] 完了。メモリを解放しました。")
 
-    signal.signal(signal.SIGINT, cleanup)
-    signal.signal(signal.SIGTERM, cleanup)
+    def on_signal(signum, frame):
+        release()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, on_signal)
+    signal.signal(signal.SIGTERM, on_signal)
 
     try:
         # メモリ確保（ページを実際に触って遅延割り当てを回避）

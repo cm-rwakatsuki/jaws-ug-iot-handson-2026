@@ -1,0 +1,41 @@
+# F-9 Red: cpu_worker がシグナルハンドラを継承する不具合
+# 実施日時: 2026-08-13 21:15 JST
+# 期待: 現状は解除処理が無いため失敗する
+
+============================= test session starts ==============================
+platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
+configfile: pytest.ini
+collecting ... collected 2 items
+
+tests/test_load_gen.py::TestCpuWorkerSignalHandling::test_worker_resets_inherited_signal_handlers FAILED [ 50%]
+tests/test_load_gen.py::TestCpuWorkerSignalHandling::test_worker_does_not_use_parent_cleanup PASSED [100%]
+
+=================================== FAILURES ===================================
+___ TestCpuWorkerSignalHandling.test_worker_resets_inherited_signal_handlers ___
+
+self = <tests.test_load_gen.TestCpuWorkerSignalHandling object at 0x107014f90>
+mock_signal = <MagicMock name='signal' id='4416424784'>
+
+    @patch("load_gen.signal.signal")
+    def test_worker_resets_inherited_signal_handlers(self, mock_signal):
+        """ワーカーの先頭で SIGINT / SIGTERM を親から切り離すこと。"""
+        stop_event = MagicMock()
+        stop_event.is_set.return_value = True  # ループに入らず即終了させる
+    
+        cpu_worker(0.5, stop_event)
+    
+        handled = {c.args[0] for c in mock_signal.call_args_list if c.args}
+>       assert signal.SIGINT in handled, (
+            "ワーカーが SIGINT のハンドラを解除していません。"
+            "親のハンドラを継承したままだとトレースバックが出ます"
+        )
+E       AssertionError: ワーカーが SIGINT のハンドラを解除していません。親のハンドラを継承したままだとトレースバックが出ます
+E       assert <Signals.SIGINT: 2> in set()
+E        +  where <Signals.SIGINT: 2> = signal.SIGINT
+
+tests/test_load_gen.py:189: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_load_gen.py::TestCpuWorkerSignalHandling::test_worker_resets_inherited_signal_handlers
+========================= 1 failed, 1 passed in 0.05s ==========================

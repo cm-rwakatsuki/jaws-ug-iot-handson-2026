@@ -6,7 +6,12 @@
 # Memory: (total - available) / total * 100
 #         ※ free コマンドの used 列とは異なる（K-2）
 
-NOW=$(date +"%Y-%m-%d %H:%M:%S JST")
+# JST を明示して取得する。
+# OS のタイムゾーンに依存すると、貸出機の設定が Asia/Tokyo でない場合
+# （Raspberry Pi OS の初期値は Europe/London になっていることがある）
+# 別のタイムゾーンの時刻を「JST」と表示してしまい、publisher の出力や
+# CloudWatch のグラフと突き合わせるときに 9 時間ずれて混乱する。
+NOW=$(TZ=Asia/Tokyo date +"%Y-%m-%d %H:%M:%S JST")
 
 # --- CPU 使用率（1 秒間の差分で計算） ---
 read_cpu_stat() {
