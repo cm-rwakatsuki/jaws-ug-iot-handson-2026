@@ -12,34 +12,34 @@ Parameters:
     Default: "001"
     AllowedPattern: "^[0-9]{3}$"
     ConstraintDescription: "3桁の数字を入力してください（例: 001）"
-    Description: "デバイス番号（3桁数字）"
+    Description: "Device Number (3-digit number)"
 
   MetricNamespace:
     Type: String
     Default: "JAWSUG/IoTHandson"
-    Description: "CloudWatch Metrics の名前空間（基本編と同じ値を指定）"
+    Description: "CloudWatch Metrics namespace (specify the same value as in the Basics section)"
 
   NotificationEmail:
     Type: String
     AllowedPattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
     ConstraintDescription: "有効なメールアドレスを入力してください"
-    Description: "アラーム通知先メールアドレス（スタック作成後に確認メールが届きます）"
+    Description: "Email address for alarm notifications (You will receive a confirmation email after creating the stack)"
 
   CpuAlarmThreshold:
     Type: Number
     Default: 80
-    Description: "CPU 使用率アラームのしきい値（%）"
+    Description: "CPU Usage Alarm Threshold (%)"
 
   AlarmPeriodSeconds:
     Type: Number
     Default: 60
     MinValue: 60
-    Description: "アラーム評価期間（秒）。標準分解能メトリクスのため 60 以上"
+    Description: "Alarm evaluation period (seconds). Must be 60 or greater for standard-resolution metrics."
 
   AlarmEvaluationPeriods:
     Type: Number
     Default: 1
-    Description: "アラーム評価回数"
+    Description: "Number of Alarm Evaluations"
 
   EnableOkNotification:
     Type: String
@@ -47,7 +47,7 @@ Parameters:
     AllowedValues:
       - "true"
       - "false"
-    Description: "ALARM → OK 復帰時の通知を有効にするか"
+    Description: "ALARM → OK: Enable notifications when the system returns to normal?"
 
 # ------------------------------------------------------------
 # Conditions
