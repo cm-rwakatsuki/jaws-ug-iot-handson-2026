@@ -42,6 +42,7 @@
 | **D-10** | Lambda のソースは `scripts/session-03/lambda/metrics_logger.py` を単一の正とし、CFN テンプレートへはインラインで埋め込む。両者の一致はテストで担保する | インラインなら S3 へのアップロードが不要で参加者の手順が 1 ステップ減る。一方でインラインコードは単体テストできないため、ソースファイルを正としてテストし、同期をテストで検証する |
 | **D-11** | Alarm の対象は **CPU 使用率のみ**（メモリは任意設定） | メモリを 80% まで押し上げるのは OOM Killer のリスクがあり、貸出機で確実に再現しづらい。CPU なら 90% 以上を安全かつ再現性高く作れる |
 | **D-12** | 参加者ごとの AWS アカウントは**個別を前提**とし、共有アカウントの場合も `DeviceNumber` で全リソース名が分離される設計とする。**（Q5 の回答）** | 個別・共有のどちらでも動作させるため、命名にデバイス番号を必ず含める（R6-6） |
+| **D-14** | **手順書は「マネジメントコンソール（UI）操作」を主たる手順とする**。AWS CLI は必須手順にせず、補足（値の確認・自動化したい人向け）に限定する。**（2026-08-13 決定）** | 参加者にとって CLI は前提（認証設定・プロファイル・シェル）が増えて詰まりやすく、画面を見ながら進めるほうが理解しやすい。第1回・第2回も CloudFormation のスタック作成をコンソールのアップロードで案内しており、そちらに揃える。なお**リソース定義自体は CloudFormation（R6-1）のまま**で、UI から「テンプレートをアップロードしてスタック作成」する形にする（IaC は維持しつつ操作は UI） |
 | **D-13** | Email サブスクリプションの承認は**当日その場で実施**する。参加者は各自固有のメールアドレスを CFN パラメータで入力する。**（Q3 の回答）** | サブスクリプション作成時点で確認メールが送信されるため、スタック作成の待ち時間中に承認を済ませられる。ただし CloudFormation は承認を待たずに `CREATE_COMPLETE` になるため、「スタックは成功しているのに通知が来ない」状態が起こりうる。これを前提に手順書とハマりポイント表を組む（K-6） |
 
 ---
@@ -84,8 +85,9 @@
   │ SNS Topic → Email     │──▶ 参加者のメール
   └───────────────────────┘
 
-  ※ 両ルールの失敗は ErrorAction で
-     CloudWatch Logs（/aws/iot/session-03/rule-errors）へ記録
+  ※ 両ルールの失敗は ErrorAction で CloudWatch Logs へ記録
+     基本：  /aws/iot/session-03/rule-errors-raspi-{n}
+     Lambda：/aws/iot/session-03/lambda-rule-errors-raspi-{n}
 ```
 
 ### 3.2 データフロー（基本経路）
@@ -149,13 +151,19 @@ sequenceDiagram
 | メトリクス名 | `CpuUtilization-raspi-{n}` / `MemoryUtilization-raspi-{n}` | 置換テンプレートで生成 |
 | Lambda 関数 | `jawsug-s3-metrics-logger-raspi-{n}` | |
 | Lambda ロググループ | `/aws/lambda/jawsug-s3-metrics-logger-raspi-{n}` | 保持 3 日 |
-| ルールエラーログ | `/aws/iot/session-03/rule-errors` | 保持 3 日 |
+| ルールエラーログ（基本） | `/aws/iot/session-03/rule-errors-raspi-{n}` | 保持 3 日。**デバイス番号を含める**（下記注記） |
+| ルールエラーログ（Lambda ルール） | `/aws/iot/session-03/lambda-rule-errors-raspi-{n}` | 保持 3 日 |
 | SNS トピック | `jawsug-s3-alarm-raspi-{n}` | |
 | CloudWatch Alarm | `jawsug-s3-cpu-high-raspi-{n}` | |
 | IAM ロール | `jawsug-s3-iot-rule-role-raspi-{n}` 他 | |
 | CFN スタック（基本） | `jawsug-iot-handson-s3-{n}` | |
 | CFN スタック（アドバンス A） | `jawsug-iot-handson-s3-lambda-{n}` | |
 | CFN スタック（アドバンス B） | `jawsug-iot-handson-s3-alarm-{n}` | |
+
+> **すべての明示的なリソース名にデバイス番号 `{n}` を含める**（D-12・R6-6・NFR-8）。
+> ロググループも例外ではない。CloudWatch Logs のロググループ名はアカウント／リージョンで
+> 一意なため、固定名にすると同一アカウントで 2 人目のスタック作成が `AlreadyExists` で失敗する。
+> この制約は `tests/test_templates.py::TestResourceNameIsolation` で機械的に検証している。
 
 ---
 
@@ -232,7 +240,7 @@ Dimension が使えない点は制約であると同時に教材になる。「D
 │       │   └── verification-log.md
 │       ├── metrics.py                    # 純粋関数（取得・整形）
 │       ├── metrics_publisher.py          # Raspberry Pi 用（MQTT 送信）
-│       ├── simulator.py                  # 実機なし参加者用
+│       ├── simulator.py                  # 運営用の予備（実機故障時・開発検証用。手順書には載せない）
 │       ├── load_gen.py                   # 負荷生成（CPU / メモリ）
 │       ├── show_metrics.sh               # デバイス側確認ヘルパー
 │       ├── lambda/
@@ -295,9 +303,15 @@ SEND_INTERVAL = int(os.environ.get("SEND_INTERVAL", "10"))  # 秒（R1-2）
 | 再接続 | `reconnect_delay_set()` による自動再接続 | R1-7 |
 | 終了処理 | `SIGINT` を捕捉し `disconnect()` → `[EXIT]` 出力 | R1-8 |
 
-#### `simulator.py`（R1-9）
+#### `simulator.py`（運営用の予備。~~R1-9~~ は削除済み）
 
-同一トピック・同一ペイロード形式で、CPU/メモリを疑似生成する。単調な乱数ではグラフが平坦になるため、**低め（10〜20%）の基準値に、コマンドライン引数で指定した区間だけ高い値（80〜95%）を重ねる**モードを持たせ、実機なしでもアドバンス B のアラーム発火まで到達できるようにする。
+> **位置付け（2026-08-13 変更）**: 全員が会場で実機を操作する前提に確定したため、
+> **参加者向けの提供物ではない**。次の 2 つの用途に限定し、**手順書には記載しない**。
+>
+> 1. 当日、貸出 Raspberry Pi が故障・接続不能になったときの運営側のバックアップ
+> 2. 実機を用意できない開発・検証環境から AWS 側の経路（Rules → CloudWatch / Lambda）を確認する用途
+
+同一トピック・同一ペイロード形式で、CPU/メモリを疑似生成する。単調な乱数ではグラフが平坦になるため、**低め（10〜20%）の基準値に、コマンドライン引数で指定した区間だけ高い値（80〜95%）を重ねる**モードを持たせ、実機なしでもアラーム発火まで到達できるようにする。
 
 ```
 python3 simulator.py --spike-after 60 --spike-duration 180 --spike-level 90
@@ -352,7 +366,7 @@ Memory : 41.8 %   ((total - available) / total)
 | --- | --- | --- |
 | `IoTThing` | `AWS::IoT::Thing` | `jawsug-raspi-{n}` |
 | `IoTPolicy` | `AWS::IoT::Policy` | Connect / Publish を自トピックに限定 |
-| `RuleErrorLogGroup` | `AWS::Logs::LogGroup` | `/aws/iot/session-03/rule-errors`、保持 3 日 |
+| `RuleErrorLogGroup` | `AWS::Logs::LogGroup` | `/aws/iot/session-03/rule-errors-raspi-{n}`、保持 3 日 |
 | `IoTRuleRole` | `AWS::IAM::Role` | `iot.amazonaws.com` を信頼、`cloudwatch:PutMetricData` と Logs 書き込み |
 | `MetricsToCloudWatchRule` | `AWS::IoT::TopicRule` | 単一ルール内に `CloudwatchMetric` アクション 2 つ（R3-3） |
 
@@ -636,6 +650,20 @@ pytest                                 # 全ユニットテストを単一コマ
 
 ユニットテストで担保できない次の項目は、実 AWS 環境で検証し `verification-log.md` に記録する。
 
+> **検証手段と手順書の書き方を混同しない（D-14）**
+>
+> 開発者が結合検証を回すときは、速さのために AWS CLI を使ってよい。
+> ただし**それをそのまま手順書に書いてはいけない**。手順書は UI 操作が主（D-14）。
+>
+> | 目的 | 手段 | 成果物への反映 |
+> | --- | --- | --- |
+> | 機能が動くか（例：置換テンプレートが評価されるか） | CLI で速く確認してよい | `verification-log.md` に記録 |
+> | 参加者が迷わず操作できるか | **コンソールで実際に操作して確認する** | `handson.md` の画面手順 |
+>
+> リソースの作成手段（CLI / コンソール）が違っても、出来上がるリソースは同一なので
+> **機能検証の結果は流用できる**。一方で**画面手順の妥当性は別途コンソールで通す必要がある**
+> （M5 のリハーサル 5.10 で担保する）。
+
 | 検証項目 | 方法 | 対応要件 |
 | --- | --- | --- |
 | メトリクスの到達 | 送信後 3 分以内にコンソールでメトリクスが出現 | R3-6 |
@@ -661,7 +689,7 @@ pytest                                 # 全ユニットテストを単一コマ
 | **K-6** | SNS の Email サブスクリプションは承認されるまで通知が届かない。かつ **CloudFormation は承認を待たずに `CREATE_COMPLETE` になる**ため、スタックが成功していても通知経路が未完成という状態が起こる | アドバンス B で「アラームは ALARM になったがメールが来ない」が発生し、原因の切り分けに時間を取られる | ①負荷をかける前に SNS コンソールでステータス `Confirmed` を確認させる ②迷惑メールフォルダの確認を手順に明記（差出人 `no-reply@sns.amazonaws.com`） ③`AllowedPattern` でアドレスの打ち間違いを作成時に弾く ④Outputs に承認が必要である旨のリマインドを出す ⑤スタック再作成時は再承認が必要である旨をハマりポイント表に記載 |
 | **K-10** | 会社支給端末・企業メールでは、外部からの確認メールがフィルタで隔離されることがある | 承認できず、アドバンス B に到達できない | 手順書で「フィルタの緩いアドレス（個人の Gmail 等）を推奨」と案内する。到達しない場合の代替として、Alarm の状態遷移をコンソールの「履歴」タブで確認する迂回手順を用意する |
 | **K-7** | 負荷区間が短いと 1 分平均に埋もれる | グラフが立たない、アラームが発火しない | 既定継続時間 180 秒（D-6）。手順書でも 3 分以上を推奨 |
-| **K-8** | 会場の Wi-Fi 帯域・NAT 制約で 8883 が通らない可能性 | 送信できない | 第1回・第2回と同じ経路のため既知。ハマりポイント表に記載し、代替として PC からの `simulator.py` を案内 |
+| **K-8** | 会場の Wi-Fi 帯域・NAT 制約で 8883 が通らない可能性 | 送信できない | 第1回・第2回と同じ経路のため既知。ハマりポイント表に記載する。**全員が実機を使う前提のため「PC のシミュレーターで代替」という逃げ道はない**（2026-08-13 の前提変更）。運営側の備えとして予備の Raspberry Pi と、切り分け用に `simulator.py`（運営用）を用意しておく |
 | **K-9** | メモリ負荷が高すぎると OOM Killer が SSH や publisher を落とす | 実習中断 | 総容量 85% 上限クランプ（R2-6）。Alarm 対象は CPU のみ（D-11） |
 
 ---
@@ -687,7 +715,7 @@ pytest                                 # 全ユニットテストを単一コマ
 | マイルストーン | 本書の該当箇所 | 主な成果物 |
 | --- | --- | --- |
 | M0 Spec 確定 | 全体 | `requirements.md` / `design.md` / `tasks.md` / `verification-log.md` |
-| M1 デバイス側実装 | 5.2、8.1 | `metrics.py` / `metrics_publisher.py` / `simulator.py` / `load_gen.py` / `show_metrics.sh` ＋テスト |
+| M1 デバイス側実装 | 5.2、8.1 | `metrics.py` / `metrics_publisher.py` / `load_gen.py` / `show_metrics.sh` ＋テスト（＋運営用予備の `simulator.py`） |
 | M2 基本経路構築 | 4.2、4.3、5.3、6 | `iot-rules-cloudwatch.yaml` |
 | M3 アドバンス A | 5.3、8.1 | `advanced-lambda.yaml` / `lambda/metrics_logger.py` ＋テスト |
 | M4 アドバンス B | 5.3、9（K-6） | `advanced-alarm.yaml` |

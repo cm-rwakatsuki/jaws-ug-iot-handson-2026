@@ -52,9 +52,13 @@ Raspberry Pi ──▶ AWS IoT Core ──▶ Rules ──▶ CloudWatch Metrics
 ### 1.3 想定参加者・前提
 
 - AWS アカウントを自身で操作できる（東京リージョン `ap-northeast-1` を使用）
-- 会場参加者は貸出 Raspberry Pi（Raspberry Pi OS Bookworm 以降、`jawsug-user`）を使用
-- リモート参加者・実機なし参加者は PC 上のシミュレーターで代替可能とする
+- **参加者は全員が会場に来場し、貸出 Raspberry Pi（Raspberry Pi OS Bookworm 以降、`jawsug-user`）の実機を操作する**
+- **リモート参加は想定しない。実機なしでの参加も想定しない**（2026-08-13 に前提を確定）
 - 第1回・第2回の受講は**前提としない**（手順書単体で完結させる）
+
+> **前提変更の記録（2026-08-13）**: 当初は「リモート参加者・実機なし参加者はシミュレーターで代替」を
+> 想定していたが、**全員が会場で実機を触る**前提に確定した。これに伴い R1-9 と NFR-9 を削除し、
+> `simulator.py` は参加者向けの提供物ではなく**運営用の予備手段**に位置付けを変更した（下記 R1-9 参照）。
 
 ---
 
@@ -96,7 +100,10 @@ Raspberry Pi ──▶ AWS IoT Core ──▶ Rules ──▶ CloudWatch Metrics
 6. WHEN 使用率の取得に失敗する THEN システム SHALL 標準出力にエラーを記録し、次の周期で再試行する（プロセスを異常終了させない）。
 7. WHEN 接続が切断される THEN システム SHALL 自動再接続を試行する。
 8. WHEN 参加者が `Ctrl+C` を入力する THEN システム SHALL MQTT を正常に切断し、終了メッセージを出力して終了する。
-9. WHEN 参加者が実機を持たない THEN システム SHALL 同一のトピック・同一ペイロード形式で送信するシミュレーターを提供する。
+9. ~~WHEN 参加者が実機を持たない THEN システム SHALL 同一のトピック・同一ペイロード形式で送信するシミュレーターを提供する。~~
+   → **削除（2026-08-13）**。全員が会場で実機を操作する前提に確定したため、参加者向けの要件ではなくなった。
+   実装済みの `simulator.py` は**運営用の予備手段**として残す（当日の実機故障時のバックアップ、および
+   実機を用意できない開発・検証環境での動作確認用）。**手順書には記載しない。**
 
 ---
 
@@ -253,6 +260,9 @@ Raspberry Pi ──▶ AWS IoT Core ──▶ Rules ──▶ CloudWatch Metrics
 7. WHEN リポジトリのルート `README.md` を更新する THEN システム SHALL 第3回の行を `T.B.D.` から実際のリンクへ更新し、ディレクトリ構成図に session-03 の各ファイルを追記する。
 8. WHEN ハンズオンが終了する THEN システム SHALL `scripts/session-03/teardown.sh` により、作成した全リソース（スタック・証明書・Thing・ローカル証明書）を削除できる。
 9. WHEN 後片付けスクリプトを実行する THEN システム SHALL 削除対象を事前に表示し、削除後に残存リソースの有無を報告する。
+10. WHEN 手順書に AWS リソースの作成・設定・確認手順を記載する THEN システム SHALL **マネジメントコンソール（UI）の操作を主たる手順**として記述する（2026-08-13 決定）。
+11. WHEN 手順書に AWS CLI のコマンドを併記する THEN システム SHALL それが**必須手順ではない補足**であることを明示する（自動化したい人向け、または値の確認用）。
+12. WHEN UI 操作を記載する THEN システム SHALL 画面遷移（左メニュー名 → タブ名 → ボタン名）を、参加者が迷わない粒度で順に記述する。
 
 ---
 
@@ -292,7 +302,7 @@ Raspberry Pi ──▶ AWS IoT Core ──▶ Rules ──▶ CloudWatch Metrics
 | NFR-6 | セキュリティ | IAM は最小権限。秘密鍵・証明書はリポジトリにコミットしない（`.gitignore` で除外） |
 | NFR-7 | セキュリティ | 参加者のメールアドレスはリポジトリ・証跡に記録しない（CloudFormation パラメータとして当日入力） |
 | NFR-8 | 再現性 | 同一手順で複数参加者が並行実行しても、リソース名・メトリクスが衝突しない |
-| NFR-9 | 可搬性 | 実機がない参加者もシミュレーターで基本編を完了できる |
+| ~~NFR-9~~ | ~~可搬性~~ | ~~実機がない参加者もシミュレーターで基本編を完了できる~~ → **削除（2026-08-13）**：全員が会場で実機を操作する前提に確定 |
 | NFR-10 | 保守性 | 言語は Python 3（デバイス側・Lambda）で統一し、依存を最小限にする |
 | NFR-11 | ドキュメント | 参加者向けドキュメントは日本語で記述する |
 | NFR-12 | 品質 | `cfn-lint` および全ユニットテストの合格を実装完了条件とする |
@@ -304,7 +314,7 @@ Raspberry Pi ──▶ AWS IoT Core ──▶ Rules ──▶ CloudWatch Metrics
 | ID | マイルストーン | 主な成果物 | 完了条件（Exit Criteria） |
 | --- | --- | --- | --- |
 | M0 | Spec 確定 | `requirements.md` / `design.md` / `tasks.md` / `verification-log.md`（雛形） | 3 ドキュメントのレビュー完了、要件 ID とタスクのトレーサビリティが取れている |
-| M1 | デバイス側の実装 | `metrics_publisher.py`、`simulator.py`、`load_gen.py`、ユニットテスト | Requirement 1・2 のテストが全件 Pass、ローカルでペイロード生成を検証済み |
+| M1 | デバイス側の実装 | `metrics_publisher.py`、`load_gen.py`、`show_metrics.sh`、ユニットテスト（＋運営用予備の `simulator.py`） | Requirement 1・2 のテストが全件 Pass、ローカルでペイロード生成を検証済み |
 | M2 | 基本経路の構築 | `cfn/session-03/iot-rules-cloudwatch.yaml` | Requirement 3・6 を満たし、実環境で CloudWatch グラフに使用率の変動が描画されること、および R2-12 の値の突き合わせ（デバイス実測値 ≒ CloudWatch 値）を確認 |
 | M3 | アドバンス A（Lambda） | Lambda ハンドラ、`cfn/session-03/advanced-lambda.yaml`、ユニットテスト | Requirement 4 のテストが全件 Pass、CloudWatch Logs にレコードが記録される |
 | M4 | アドバンス B（Alarm → Email） | `cfn/session-03/advanced-alarm.yaml` | Requirement 5 を満たし、負荷生成により実際にメールが届くことを確認 |

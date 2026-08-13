@@ -47,10 +47,12 @@ Resources:
             Resource: !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/jawsug/session-03/raspi-${DeviceNumber}/metrics"
 
   # ルールエラー用ロググループ（保持 3 日）
+  # 名前にデバイス番号を含める。同一アカウントで複数の参加者が並行して
+  # スタックを作成しても衝突しないようにするため（D-12 / R6-6 / NFR-8）
   RuleErrorLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: "/aws/iot/session-03/rule-errors"
+      LogGroupName: !Sub "/aws/iot/session-03/rule-errors-raspi-${DeviceNumber}"
       RetentionInDays: 3
 
   # IoT ルール用 IAM ロール

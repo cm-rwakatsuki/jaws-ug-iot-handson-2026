@@ -82,6 +82,85 @@ class TestCfnLint:
 
 
 # ============================================================
+# リソース名の分離検証（D-12 / R6-6）
+# ============================================================
+
+# 明示的に名前を指定するプロパティ（すべて DeviceNumber を含む必要がある）
+NAME_PROPERTIES = [
+    "LogGroupName",
+    "RoleName",
+    "FunctionName",
+    "TopicName",
+    "AlarmName",
+    "RuleName",
+    "ThingName",
+    "PolicyName",
+]
+
+
+def as_name_string(value):
+    """名前プロパティの値を文字列として取り出す。
+
+    CfnLoader により !Sub は {"Fn::Sub": "..."} になる。
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict) and "Fn::Sub" in value:
+        sub = value["Fn::Sub"]
+        if isinstance(sub, str):
+            return sub
+    return None
+
+
+def collect_named_resources(template: dict):
+    """テンプレートから (論理ID, プロパティ名, 名前文字列) を集める。"""
+    found = []
+    for logical_id, resource in template.get("Resources", {}).items():
+        props = resource.get("Properties", {})
+        if not isinstance(props, dict):
+            continue
+        for prop in NAME_PROPERTIES:
+            if prop in props:
+                name = as_name_string(props[prop])
+                if name is not None:
+                    found.append((logical_id, prop, name))
+    return found
+
+
+class TestResourceNameIsolation:
+    """すべての明示的なリソース名が DeviceNumber を含むこと（D-12・R6-6）。
+
+    同一 AWS アカウントで複数の参加者が並行してスタックを作成しても
+    名前が衝突しないことを担保する（NFR-8）。
+    """
+
+    @pytest.mark.parametrize(
+        "template_path",
+        [BASIC_TEMPLATE, LAMBDA_TEMPLATE, ALARM_TEMPLATE],
+        ids=["basic", "lambda", "alarm"],
+    )
+    def test_all_resource_names_include_device_number(self, template_path):
+        """明示的に名前を付けた全リソースが ${DeviceNumber} を含む。"""
+        template = load_template(template_path)
+        named = collect_named_resources(template)
+
+        # 名前を明示しているリソースが 1 つ以上あること（テスト自体の妥当性確認）
+        assert named, f"{template_path.name} に名前付きリソースが見つかりません"
+
+        violations = [
+            f"{logical_id}.{prop} = {name!r}"
+            for logical_id, prop, name in named
+            if "${DeviceNumber}" not in name
+        ]
+
+        assert not violations, (
+            f"{template_path.name}: 以下のリソース名が DeviceNumber を含んでいません。\n"
+            "同一アカウントで複数の参加者が作成すると衝突します（D-12・NFR-8）。\n  "
+            + "\n  ".join(violations)
+        )
+
+
+# ============================================================
 # 基本テンプレートの構造検証
 # ============================================================
 

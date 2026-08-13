@@ -70,7 +70,7 @@ scripts/session-03/evidence/m1/1.15-pytest-result.txt
 
 ステータスは `未着手` / `進行中` / `完了` / `保留`。
 
-> **現時点の到達点**: コード・IaC・ユニットテストは揃い、静的検証（pytest 78 件 / cfn-lint 3 本）は全件 Pass。
+> **現時点の到達点**: コード・IaC・ユニットテストは揃い、静的検証（pytest 81 件 / cfn-lint 3 本）は全件 Pass。
 > ただし **実 AWS 環境および実機 Raspberry Pi での検証は一切未実施**であり、当日運用可能な状態ではない。
 > 残る主要作業は「実環境デプロイ検証（2.6〜2.10 / 3.5〜3.7 / 4.3〜4.6）」と「M5 ドキュメント」。
 
@@ -84,12 +84,13 @@ scripts/session-03/evidence/m1/1.15-pytest-result.txt
 | R4 Rules → Lambda → Logs | M3-UT, 3.5, 3.6, 3.7 | 進行中 | ハンドラのユニットテスト（R4-2/4/6）は Pass。**実環境連携は未検証** |
 | R5 Alarm → SNS → Email | M4-0, 4.3, 4.4, 4.5, 4.6 | 進行中 | テンプレート構造（R5-6/7）は Pass。**メール到達（R5-5）は未検証** |
 | R6 CloudFormation | M2-0, M4-0, 2.6, 3.4, 4.2 | 進行中 | R6-9（cfn-lint）は Pass。**R6-7（作成時間）・R6-8 は未検証** |
-| R7 TDD | M1-UT, M3-UT, 5.11 | **一部 Fail** | R7-2〜R7-9 は Pass。**R7-1（Red → Green の順序）は未遵守。M1-UT 備考および 8 章参照** |
+| R7 TDD | M1-UT, M3-UT, **M2-F1**, 5.11 | **一部 Fail** | R7-2〜R7-9 は Pass。**R7-1（Red → Green の順序）は M1・M3 で未遵守**（M1-UT 備考および 8 章参照）。**M2-F1（F-1 修正）以降は遵守**し、Red ログを証跡として保存 |
 | R8 ドキュメント | 5.10, 5.11 | 未検証 | M5 未着手 |
 | R9 証跡 | 本文書全体, 5.11 | 進行中 | 本更新で M0〜M4 の静的検証分を記録 |
 | NFR-4 所要時間 | 5.10 | 未検証 | |
 | NFR-6/7 セキュリティ | M0-1, 5.11 | 進行中 | `certs/` / `.venv/` の ignore は確認済み（M0-1） |
-| NFR-12 品質 | M0-1, M1-UT, M3-UT, M2-0 | Pass（静的検証範囲） | pytest 78 件 / cfn-lint 3 本すべて合格 |
+| **NFR-8 再現性** | **M2-F1** | **Pass（静的検証範囲）** | 3 テンプレートの全リソース名が `${DeviceNumber}` を含むことをテストで担保（F-1 で解消）。実環境での並行作成は未検証 |
+| NFR-12 品質 | M0-1, M1-UT, M3-UT, M2-0, M2-F1 | Pass（静的検証範囲） | pytest **81 件** / cfn-lint 3 本すべて合格。shellcheck 指摘 0 件 |
 
 状態は `未検証` / `進行中` / `Pass` / `Fail`。
 
@@ -191,7 +192,7 @@ scripts/session-03/evidence/m1/1.15-pytest-result.txt
 - [ ] ErrorAction ログにエラーがない（D-3 の明示キャストが機能）→ **未実施**
 - [ ] 期間 1 分のグラフで負荷の台形が視認でき、平常値との差が 30 ポイント以上（R2-7）→ **未実施**
 - [ ] 3 点セットが ±5 ポイント以内で一致（R2-12）→ **未実施**
-- [ ] スタック削除が成功 → **未実施**
+- [x] スタック削除が成功（2026-08-13。`teardown.sh` の不具合 F-3d / F-3e / F-3f を発見・修正） → **未実施**
 
 ### M3 → **進行中**（実 AWS 環境が未実施）
 
@@ -215,9 +216,10 @@ scripts/session-03/evidence/m1/1.15-pytest-result.txt
 - [ ] しきい値・期間の既定値を実測に基づいて確定（Q2）→ **未実施**（暫定値のまま）
 - [ ] スタック再作成時に再承認が必要であることを確認（K-6）→ **未実施**
 
-### M5 → **未着手**
+### M5 → **ほぼ未着手**（骨格のみ）
 
-- [ ] 手順書・構成図・README が揃っている → **未着手**（`handson.md` / `architecture.drawio.svg` / README 更新すべて未作成）
+- [ ] 手順書・構成図・README が揃っている → 🚧 **`handson.md` は骨格のみ**（5.2・5.3 完了、実測依存の 6 セクションが TODO）。`architecture.drawio.svg` と README は**未作成**
+- [ ] `handson.md` の `<!-- TODO -->` と「🚧 執筆ステータス」ブロックがすべて解消されている → **未達成**（公開前チェック項目）
 - [ ] 通し実行が 90 分以内で完了（NFR-4）→ **未実施**
 - [ ] 基本編が 60 分以内で完了 → **未実施**
 - [ ] ハマりポイント表に M1〜M4 で実際に遭遇した事象が反映されている（R8-4）→ **未着手**。反映候補は下記
@@ -581,6 +583,107 @@ pytest tests/test_templates.py         → 17 passed
 
 ---
 
+#### M2-F1 リソース名の衝突修正（F-1）— ✅ Red → Green を遵守
+
+| 項目 | 内容 |
+| --- | --- |
+| 実施日時 | 2026-08-10 07:25 JST |
+| マイルストーン | M2 |
+| タスク ID | F-1（`next-actions.md` F セクション） |
+| 対応要件 | R6-6, R7-1, NFR-8 |
+| 対応設計 | D-12 |
+
+**背景**
+
+`iot-rules-cloudwatch.yaml` の `RuleErrorLogGroup` を `/aws/iot/session-03/rule-errors` という
+**デバイス番号を含まない固定名**で実装していた。`design.md` 3.4 節の命名規約どおりだったが、
+D-12（共有アカウントでも `DeviceNumber` で全リソース名が分離される）と矛盾する。
+CloudWatch Logs のロググループ名はアカウント／リージョンで一意なため、
+**同一アカウントで 2 人目のスタック作成が `AlreadyExists` で失敗する**。
+
+**⭐ 本件は R7-1（Red → Green → Refactor）の順序を遵守した**
+
+M1・M3 で逸脱していた TDD 順序について「今後の追加・修正分では Red を先に記録する」と
+宣言していたため、その最初の適用例となる。
+
+**Red（実装修正の前）**
+
+追加したテスト: `tests/test_templates.py::TestResourceNameIsolation`
+3 テンプレートすべてについて、明示的に名前を指定するプロパティ
+（`LogGroupName` / `RoleName` / `FunctionName` / `TopicName` / `AlarmName` / `RuleName` /
+`ThingName` / `PolicyName`）が `${DeviceNumber}` を含むことを検証する。
+
+```bash
+pytest tests/test_templates.py::TestResourceNameIsolation -v
+```
+
+```
+tests/...::test_all_resource_names_include_device_number[basic]  FAILED
+tests/...::test_all_resource_names_include_device_number[lambda] PASSED
+tests/...::test_all_resource_names_include_device_number[alarm]  PASSED
+
+E   AssertionError: iot-rules-cloudwatch.yaml: 以下のリソース名が DeviceNumber を含んでいません。
+E     同一アカウントで複数の参加者が作成すると衝突します（D-12・NFR-8）。
+E       RuleErrorLogGroup.LogGroupName = '/aws/iot/session-03/rule-errors'
+
+1 failed, 2 passed in 0.05s
+```
+
+→ **意図したリソース 1 件のみが、意図した理由で失敗**。Lambda・Alarm テンプレートは
+既にデバイス番号入りだったため Pass。テストが正しく問題を特定していることを確認。
+
+**Green（修正後）**
+
+```yaml
+      LogGroupName: !Sub "/aws/iot/session-03/rule-errors-raspi-${DeviceNumber}"
+```
+
+```
+3 passed in 0.03s                    # TestResourceNameIsolation
+cfn-lint ... exit code: 0            # 3 テンプレート合格
+81 passed in 1.92s                   # 全件（78 → 81 に増加）
+```
+
+**期待結果**
+
+- [x] Red で基本テンプレートのみが失敗する
+- [x] 修正後に 3 テンプレートすべて Pass
+- [x] `cfn-lint` が引き続き合格
+- [x] 既存 78 件のテストが壊れない
+
+**実際の結果**: 上記のとおり全項目達成。テスト総数 78 → **81 件**。
+
+**判定**: **Pass**
+
+**証跡**: `evidence/m2/F-1-red.txt`、`evidence/m2/F-1-green.txt`
+
+**副次的に対応した項目**
+
+| # | 内容 |
+| --- | --- |
+| F-3b | `teardown.sh` の残存確認にロググループ 3 件のチェックを追加（ロググループ名が変わったため、あわせて対応） |
+| — | `teardown.sh` の `read` に `-r` を付与（shellcheck SC2162）。`teardown.sh` / `show_metrics.sh` ともに shellcheck 指摘 0 件になった |
+
+**更新した文書**
+
+| ファイル | 箇所 |
+| --- | --- |
+| `cfn/session-03/iot-rules-cloudwatch.yaml` | `RuleErrorLogGroup.LogGroupName`（コメントで理由も記載） |
+| `scripts/session-03/tests/test_templates.py` | `TestResourceNameIsolation` を追加（再発防止） |
+| `scripts/session-03/teardown.sh` | ロググループの残存確認を追加、`read -r` |
+| `spec/design.md` | 3.1 節の構成図、3.4 節の命名規約（＋注記）、5.3 節のリソース表 |
+| `docs/session-03/handson.md` | AWS 側設定のリソース名表 |
+| `spec/next-actions.md` | C-1 補足、F セクションの状態列 |
+| `spec/verification-log.md` | M2-2 の確認コマンド、本エントリ |
+
+**備考**
+
+- 今後、同種の名前衝突はテストで自動検出される。**新しいリソースを追加するときは
+  名前に `${DeviceNumber}` を含めること**がテストで強制される
+- `RuleErrorLogGroupName` Output は `!Ref RuleErrorLogGroup` のままで正しく新名称を返す
+
+---
+
 #### M2-1 スタック作成と証明書発行（タスク 2.6）
 
 | 項目 | 内容 |
@@ -610,11 +713,49 @@ aws cloudformation create-stack \
 - Outputs に 8 項目が出力される
 - 証明書を発行しポリシーをアタッチできる
 
-**実際の結果**: _（未記入）_
+**実際の結果**（2026-08-13 13:43〜13:47 JST 実施）
 
-**スタック作成所要時間**: _（未記入）_
+| 確認項目 | 結果 |
+| --- | --- |
+| `validate-template` | ✅ 成功。`CAPABILITY_NAMED_IAM` を要求することも確認 |
+| スタック作成 | ✅ `CREATE_COMPLETE` |
+| **作成所要時間** | **62 秒**（R6-7 の 300 秒以内 ✅） |
+| Outputs | ✅ 必須 8 項目すべて出力（＋ `NextStep`）。R6-5 達成 |
+| 作成リソース | ✅ 5 個（`IoTThing` / `IoTPolicy` / `IoTRuleRole` / `RuleErrorLogGroup` / `MetricsToCloudWatchRule`） |
+| **F-1 の修正反映** | ✅ ロググループ名が `/aws/iot/session-03/rule-errors-raspi-001`（デバイス番号入り） |
+| 証明書の発行 | ✅ `create-keys-and-certificate --set-as-active` で発行、`ACTIVE` を確認 |
+| ポリシー／Thing へのアタッチ | ⏸ **未実施**（D-14 によりコンソールで実施する方針に変更） |
 
-**判定**: _（未実施）_
+**ルール定義の確認（K-3・D-3 の重要な裏付け）**
+
+`aws iot get-topic-rule` で登録済み定義を確認した結果、**置換テンプレートが CloudFormation に
+消費されずリテラルとして保持**されていた。
+
+```
+SQL             : SELECT * FROM 'jawsug/session-03/+/metrics'
+SQL バージョン  : 2016-03-23
+アクション数    : cloudwatchMetric × 2（R3-3 ✅）
+  [1] metricName = CpuUtilization-${topic(3)}      ← 置換テンプレートが保持されている
+      metricValue = ${cast(cpu AS String)}
+      metricTimestamp = ${cast(timestamp AS String)}
+  [2] metricName = MemoryUtilization-${topic(3)}
+      metricValue = ${cast(memory AS String)}
+ErrorAction     : cloudwatchLogs → /aws/iot/session-03/rule-errors-raspi-001（R3-7 ✅）
+```
+
+→ **K-3（`!Sub` と置換テンプレートの `${...}` 衝突）はテンプレート定義レベルで回避できている**ことを実証。
+ただし**実行時に評価されるか（`raspi-001` に展開されるか）はタスク 2.7 で確認**する。
+
+**判定**: **Pass（機能・定義面）／ 未完了（画面手順・アタッチ）**
+
+**⚠️ 実行手段についての注記（D-14）**
+
+本エントリの実行は**すべて AWS CLI** で行った（検証を速く回すため）。
+一方 2026-08-13 の方針決定により **手順書は UI 操作を主とする**（D-14 / R8-10〜12）。
+
+リソースの作成手段が CLI かコンソールかで**出来上がるリソースは変わらない**ため、
+上記の機能・定義面の検証結果はそのまま有効。ただし
+**参加者が辿る画面手順の妥当性は別途コンソールで通す必要がある**（未実施）。
 
 **証跡**: `evidence/m2/2.6-stack-outputs.txt`
 
@@ -635,7 +776,7 @@ aws cloudformation create-stack \
 python3 metrics_publisher.py
 # 確認側
 aws cloudwatch list-metrics --namespace JAWSUG/IoTHandson --region ap-northeast-1
-aws logs tail /aws/iot/session-03/rule-errors --region ap-northeast-1
+aws logs tail /aws/iot/session-03/rule-errors-raspi-001 --region ap-northeast-1
 ```
 
 **期待結果**
@@ -739,11 +880,66 @@ python3 load_gen.py cpu --target 90 --duration 180
 - スタックが `DELETE_COMPLETE` になる
 - Thing・ルール・ロググループが残らない
 
-**実際の結果**: _（未記入）_
+**実際の結果**（2026-08-13 14:04〜14:20 JST 実施。`teardown.sh` の初回実行）
 
-**判定**: _（未実施）_
+| 確認項目 | 結果 |
+| --- | --- |
+| スタック削除 | ✅ `DELETE_COMPLETE` |
+| Thing / IoT ポリシー / IoT ルール / IAM ロール / ロググループ | ✅ すべて削除を独立に確認 |
+| ローカル `certs/` | ✅ 削除 |
+| **証明書** | ❌ **削除されなかった**（下記 F-3d） |
+| 空の状態での再実行（冪等性） | ✅ 落ちずに完走（exit 0） |
+
+**判定**: **Fail →（修正後）Pass**
+
+**🔴 発見 1（F-3d）：アタッチしていない証明書を検出できず、孤児として残る**
+
+`teardown.sh` は「✅ 証明書の削除完了」と表示したが、**実際には 1 件も削除していなかった**。
+独立検証で、発行した証明書が `ACTIVE` のまま残存していることを確認した。
+
+| 項目 | 内容 |
+| --- | --- |
+| 原因 | 証明書を `list-thing-principals`（Thing にアタッチ済みの principal）からのみ探していた。今回は証明書を発行したが Thing へのアタッチ前に削除を実行したため、検出できなかった |
+| なぜ気づけたか | スクリプトの表示を信用せず、`aws iot list-certificates` で独立に確認したため。**表示だけ見ていたら見逃していた**（F-3c「エラーを握り潰して成功と表示する」が実際に害を出した例） |
+| 参加者への影響 | 「証明書を作ったがアタッチを忘れた」というよくある失敗のあと後片付けすると、証明書が残る（課金は無いが不衛生） |
+| 対処 | 証明書の探索経路を **2 つ**にした。①Thing の principal ②**ポリシーのターゲット**（`list-targets-for-policy`）。加えて、1 件も見つからない場合は「✅ 完了」ではなく**警告を出し、コンソールでの確認を促す**ようにした |
+
+**🔴 発見 2（F-3e）：UTF-8 ロケールで削除対象一覧が文字化けし、スタック名が消える**
+
+出力に不正バイト（`0xBC`）が混入し、削除対象一覧が
+`- ��アドバンス B: 存在する場合）` のように表示されていた（**スタック名が欠落**）。
+
+| 項目 | 内容 |
+| --- | --- |
+| 原因 | `echo "    - $STACK_ALARM（アドバンス B...）"` のように **`$VAR` の直後に全角文字**が続いていた。UTF-8 ロケールの bash は全角文字の先頭バイトを変数名の一部として解釈し、変数が未定義になって残バイトが不正な出力になる |
+| 再現条件 | `LC_ALL=C` では**正常**、`LC_ALL=en_US.UTF-8` で**壊れる**。最小再現で確認済み |
+| 参加者への影響 | **大きい**。参加者の環境はほぼ UTF-8 であり、**R8-9（削除対象を事前に表示する）が実質的に機能していなかった**。何が削除されるか読めない状態で `y` を求めていた |
+| 対処 | 該当 3 箇所を `${STACK_ALARM}（...` のようにブレース付きへ修正。修正後、UTF-8 ロケールで出力が妥当な UTF-8 になり、スタック名も正しく表示されることを確認 |
+| 横展開 | 第1回・第2回の `teardown.sh` / `led_ctrl.sh`、および `show_metrics.sh` を同じパターンで検査 → **該当なし**（第3回のみの問題） |
+
+**修正後の再検証**
+
+```
+bash -n teardown.sh        → 構文 OK
+shellcheck teardown.sh     → 指摘 0 件
+LC_ALL=en_US.UTF-8 で実行  → 出力は妥当な UTF-8。スタック名が正しく表示される
+空の状態で再実行            → exit 0（冪等）
+```
+
+**あわせて修正した点**
+
+- Thing の削除で、**存在しなくても「✅ 削除完了」と表示**されていた（`aws iot delete-thing` は対象が
+  無くても成功扱いになる）。存在確認してからメッセージを出し分けるようにした（F-3c 系の是正）
 
 **証跡**: `evidence/m2/2.10-teardown.txt`
+
+**備考**
+
+- 本エントリは「スタック削除の確認」と「`teardown.sh` の初回実行検証」を兼ねている
+- 削除は方針変更（D-14：手順書は UI 操作を主とする）に伴う**やり直しのための削除**でもある。
+  スタックは**コンソールから作り直す**（タスク 2.6 を再実施）
+- 同一アカウントには別プロジェクトの証明書が 9 件あった。**作成日時（2026-08-13）と
+  ポリシー／Thing 未紐付けの 2 条件で自分の証明書 1 件のみを特定**して削除し、他は触っていない
 
 ---
 
@@ -1223,3 +1419,13 @@ git ls-files | grep -i "certs/" || echo "certs は未コミット"
 | 2026-08-08 | M3-UT | `scripts/session-03/tests/test_templates.py`、`test_lambda_inline_sync.py` | CFN の intrinsic function を扱うため `CfnLoader`（`yaml.SafeLoader` 継承）を追加 |
 | 2026-08-08 | M3-UT | （設計判断・design.md 未更新） | D-10 のインライン同期テストを「完全一致」ではなく「docstring / コメント / 空行を除いた機能行の一致」で実装。インデント調整による本質的でない失敗を避けるため。`design.md` 8.1 節の記述と厳密には異なるが意図（機能コードの差異検出）は満たす |
 | 2026-08-08 | 実装時 | （要修正・未反映） | 4 文書のヘッダーが配置先を `scripts/session-03/specs/` と記載しているが、実際のディレクトリは **`scripts/session-03/spec/`**（単数形）。`design.md` 5.1 節のディレクトリ構成図も `specs/` になっている。ドキュメント側の表記を実態に合わせるか、ディレクトリをリネームするかを M5 で統一する |
+| 2026-08-08 | 実装レビュー | **`cfn/session-03/iot-rules-cloudwatch.yaml`（要修正・未反映）** | `RuleErrorLogGroup` を `/aws/iot/session-03/rule-errors` という**デバイス番号を含まない固定名**で実装した（`design.md` 3.4 節の命名規約どおり）。しかし D-12（共有アカウントでも `DeviceNumber` で全リソース名が分離される）と矛盾し、**同一アカウントで 2 人目のスタック作成が `AlreadyExists` で失敗する**。`advanced-lambda.yaml` 側はデバイス番号入りにしてあるため不統一でもある。`rule-errors-raspi-${DeviceNumber}` への変更を推奨。`next-actions.md` F-1 |
+| 2026-08-08 | 実装レビュー | （要確認・未反映） | `teardown.sh` は `set -e` 下で `aws cloudformation wait stack-delete-complete` を呼ぶため、スタックが `DELETE_FAILED` になるとスクリプト全体が中断し、ローカル `certs/` 削除と残存確認が実行されない。また証明書削除の各呼び出しが `2>/dev/null \|\| true` でエラーを握り潰すため、1 件も削除できなくても「削除完了」と表示される。`next-actions.md` F-3a / F-3c |
+| 2026-08-08 | M5 着手 | `docs/session-03/handson.md`（新規）、`scripts/session-03/spec/next-actions.md`（新規） | 実測不要のタスク 5.2・5.3 を先行実施し、手順書の骨格（ゴール / 進め方 / 所要時間 / 学習内容）を作成。実測依存のセクションは `<!-- TODO(タスクID) -->` と「🚧 執筆ステータス」ブロックで明示。あわせて実環境検証の実行手順を `next-actions.md` に整備し、「実行 → `verification-log.md` へ記録 → `handson.md` へ転記」の対応表を用意した |
+| **2026-08-10** | **F-1 修正（M2-F1）** | `cfn/session-03/iot-rules-cloudwatch.yaml`、`spec/design.md` 3.1・3.4・5.3 節、`docs/session-03/handson.md`、`scripts/session-03/teardown.sh`、`tests/test_templates.py` | **上記 F-1 の指摘を解消**。`RuleErrorLogGroup` を `/aws/iot/session-03/rule-errors-raspi-${DeviceNumber}` に変更し、`design.md` の命名規約を実態に合わせて更新（「すべての明示的なリソース名にデバイス番号を含める」旨の注記を追加）。再発防止として `TestResourceNameIsolation` を追加し、3 テンプレートの全名前プロパティを機械的に検証。**本件は R7-1（Red → Green）を遵守**し、Red の失敗ログを `evidence/m2/F-1-red.txt` に保存 |
+| 2026-08-10 | F-1 の副産物 | `scripts/session-03/teardown.sh` | 残存確認にロググループ 3 件のチェックを追加（F-3b 解消）。`read -r`（shellcheck SC2162）を修正。`teardown.sh` / `show_metrics.sh` ともに shellcheck 指摘 0 件 |
+| **2026-08-13** | **構成図レビュー指摘（タスク 5.1）** | `docs/session-03/architecture.drawio`（新規）、`docs/session-03/handson.md` | 当初 SVG を手書きで生成してプロセス図（データフロー）にしていたが、レビューで **「Deployment 図にすべき。どの AWS サービスを利用しているか分からない」**「AWS 公式アイコンを使うこと」と指摘。方針を変更し、①図の種類を Deployment 図へ、②**破線枠 = CloudFormation スタック**でデプロイ単位を表現、③AWS 公式アイコン（draw.io 内蔵 `mxgraph.aws4`）を使用、④SVG 手書きをやめて **`.drawio` を成果物**とし SVG は draw.io から書き出す方式に変更。手書き SVG（`architecture.drawio.svg`）は削除した |
+| 2026-08-13 | 同上（検証方法） | （記録のみ） | AWS 公式アイコンのシェイプ名・カテゴリ色を**推測せず**、draw.io の `Sidebar-AWS4.js` 実定義を参照して確認した（`iot_core`/`#7AA116`、`lambda`/`#ED7100`、`cloudwatch_2`・`sns`・`alarm`・`cloudwatch_logs`/`#E7157B`、`group_aws_cloud_alt`・`group_region`・`group_corporate_data_center`、`illustration_devices`・`illustration_notification`）。当初 `cloudwatch_alarm` と推測していたが正しくは `alarm` であり、確認した価値があった |
+| 2026-08-13 | 同上（制約） | （解決済み） | ローカルに draw.io / CLI がなく `.drawio` から SVG を書き出せなかった。**リポジトリオーナーが `architecture-v2.drawio` / `architecture-v2.svg` を作成**し、これを正とすることで解決。私が作成した `architecture.drawio` は削除した |
+| **2026-08-13** | **構成図の作成者変更（タスク 5.1）** | `docs/session-03/architecture-v2.drawio`、`architecture-v2.svg`（オーナー作成）、`docs/session-03/handson.md` | 私が作成した図はアーキテクチャの粒度が想定と合わなかったため、**オーナーが v2 を作成**。v2 を正とし、私の `architecture.drawio` を削除。v2 は AWS 公式アイコン（`iot_core` / `lambda` / `cloudwatch_2` / `sns` / `alarm` / `logs` / `rule` / `hardware_board`）を使用し、**コース単位（Basic / Advanced Course1 / Advanced Course2）でグルーピング**する粒度。handson.md に SVG を埋め込み、コース名を図に合わせて統一した |
+| **2026-08-13** | **前提変更：リモート参加なし・全員が実機を操作** | `requirements.md` 1.3・R1-9・NFR-9・M1 成果物、`design.md` 5.1・5.2・K-8・11 章、`tasks.md` 1.8・成果物一覧、`docs/session-03/handson.md`、`spec/next-actions.md`、`scripts/session-03/simulator.py` | 「リモート参加者・実機なし参加者はシミュレーターで代替」という当初前提を、**全員が会場で貸出 Raspberry Pi を操作する**前提に変更。**R1-9（シミュレーター提供）と NFR-9（可搬性）を削除**（取り消し線で履歴を残す）。`simulator.py` は削除せず**運営用の予備**（当日の実機故障時のバックアップ／実機なしでの AWS 経路検証）に位置付け変更し、**手順書には記載しない**方針とした。K-8（会場 Wi-Fi で 8883 が通らないリスク）は「PC のシミュレーターで代替」という逃げ道が無くなったため、**予備の Raspberry Pi を運営側で用意する**方針を追記 |

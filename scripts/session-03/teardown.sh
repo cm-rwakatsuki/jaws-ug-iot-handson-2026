@@ -24,12 +24,12 @@ echo "  - IoT Thing: $THING_NAME"
 echo "  - IoT Policy: $POLICY_NAME"
 echo "  - Thing にアタッチされた証明書"
 echo "  - CloudFormation スタック:"
-echo "    - $STACK_ALARM（アドバンス B: 存在する場合）"
-echo "    - $STACK_LAMBDA（アドバンス A: 存在する場合）"
-echo "    - $STACK_BASIC（基本編）"
+echo "    - ${STACK_ALARM}（Advanced Course2: 存在する場合）"
+echo "    - ${STACK_LAMBDA}（Advanced Course1: 存在する場合）"
+echo "    - ${STACK_BASIC}（Basic Course）"
 echo "  - ローカル certs/ ディレクトリ"
 echo ""
-read -p "続行しますか？ (y/N): " CONFIRM
+read -r -p "続行しますか？ (y/N): " CONFIRM
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
   echo "中止しました。"
   exit 0
@@ -46,27 +46,47 @@ echo "✅ AWS 認証情報確認済み"
 echo ""
 
 # --- 1. 証明書のデタッチ・無効化・削除 ---
+# 証明書は 2 つの経路で探す。
+#   (a) Thing にアタッチ済みの証明書 … 正常に手順を終えた場合
+#   (b) ポリシーにアタッチ済みの証明書 … 証明書を作ったが Thing へのアタッチを忘れた場合
+# (b) を見ないと「作ったが紐付いていない証明書」が孤児として残る（2026-08-13 に実機検証で判明）
 echo "[1/5] 証明書を削除しています..."
-PRINCIPALS=$(aws iot list-thing-principals \
-  --thing-name "$THING_NAME" \
-  --region "$REGION" \
-  --query "principals" \
-  --output json 2>/dev/null || echo "[]")
 
-echo "$PRINCIPALS" | python3 -c "
-import sys, json
-for p in json.load(sys.stdin):
-    print(p)
-" 2>/dev/null | while read -r CERT_ARN; do
-  CERT_ID=$(echo "$CERT_ARN" | cut -d: -f6 | cut -d/ -f2)
-  echo "  証明書 ID: ${CERT_ID:0:8}..."
+CERT_ARNS=$(
+  {
+    aws iot list-thing-principals --thing-name "$THING_NAME" --region "$REGION" \
+      --query "principals[]" --output text 2>/dev/null || true
+    aws iot list-targets-for-policy --policy-name "$POLICY_NAME" --region "$REGION" \
+      --query "targets[]" --output text 2>/dev/null || true
+  } | tr '\t' '\n' | grep -E '^arn:aws:iot:[^:]+:[0-9]+:cert/' | sort -u || true
+)
 
-  aws iot detach-thing-principal --thing-name "$THING_NAME" --principal "$CERT_ARN" --region "$REGION" 2>/dev/null || true
-  aws iot detach-policy --policy-name "$POLICY_NAME" --target "$CERT_ARN" --region "$REGION" 2>/dev/null || true
-  aws iot update-certificate --certificate-id "$CERT_ID" --new-status INACTIVE --region "$REGION" 2>/dev/null || true
-  aws iot delete-certificate --certificate-id "$CERT_ID" --region "$REGION" 2>/dev/null || true
-done
-echo "✅ 証明書の削除完了"
+CERT_COUNT=0
+if [ -n "$CERT_ARNS" ]; then
+  while read -r CERT_ARN; do
+    [ -z "$CERT_ARN" ] && continue
+    CERT_ID="${CERT_ARN##*/}"
+    echo "  証明書 ID: ${CERT_ID:0:8}..."
+    CERT_COUNT=$((CERT_COUNT + 1))
+
+    aws iot detach-thing-principal --thing-name "$THING_NAME" --principal "$CERT_ARN" --region "$REGION" 2>/dev/null || true
+    aws iot detach-policy --policy-name "$POLICY_NAME" --target "$CERT_ARN" --region "$REGION" 2>/dev/null || true
+    aws iot update-certificate --certificate-id "$CERT_ID" --new-status INACTIVE --region "$REGION" 2>/dev/null || true
+    if aws iot delete-certificate --certificate-id "$CERT_ID" --region "$REGION" 2>/dev/null; then
+      echo "    ✅ 削除しました"
+    else
+      echo "    ⚠️  削除できませんでした（コンソールで確認してください）"
+    fi
+  done <<< "$CERT_ARNS"
+fi
+
+if [ "$CERT_COUNT" -eq 0 ]; then
+  echo "  ⚠️  この Thing / ポリシーに紐付く証明書は見つかりませんでした（スキップ）"
+  echo "     証明書を発行したのにアタッチしていない場合は、この方法では検出できません。"
+  echo "     IoT Core > セキュリティ > 証明書 で、紐付けのない証明書が残っていないか確認してください。"
+else
+  echo "✅ 証明書の削除完了（$CERT_COUNT 件を処理）"
+fi
 echo ""
 
 # --- 2. CloudFormation スタックの削除（アドバンス B → A → 基本の順） ---
@@ -90,10 +110,18 @@ delete_stack_if_exists "$STACK_BASIC"
 echo ""
 
 # --- 3. Thing の削除（スタックで作成されなかった場合の保険） ---
+# 注意: aws iot delete-thing は対象が存在しなくても成功扱いになるため、
+# 先に存在確認をしてからメッセージを出し分ける（誤って「削除完了」と報告しないため）
 echo "[3/5] Thing を確認しています..."
-aws iot delete-thing --thing-name "$THING_NAME" --region "$REGION" 2>/dev/null && \
-  echo "✅ Thing の削除完了" || \
-  echo "⚠️  Thing は存在しないかすでに削除済みです（スキップ）"
+if aws iot describe-thing --thing-name "$THING_NAME" --region "$REGION" > /dev/null 2>&1; then
+  if aws iot delete-thing --thing-name "$THING_NAME" --region "$REGION" 2>/dev/null; then
+    echo "✅ Thing の削除完了"
+  else
+    echo "⚠️  Thing を削除できませんでした（証明書がアタッチされたままの可能性があります）"
+  fi
+else
+  echo "⚠️  Thing は存在しません（スタック削除時に消えたか、もともと未作成）"
+fi
 echo ""
 
 # --- 4. ローカル証明書ファイルの削除 ---
@@ -132,6 +160,22 @@ done
 for STACK in "$STACK_BASIC" "$STACK_LAMBDA" "$STACK_ALARM"; do
   if aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" > /dev/null 2>&1; then
     echo "  ⚠️  スタックが残っています: $STACK"
+    REMAINING=$((REMAINING + 1))
+  fi
+done
+
+# ロググループ（スタック削除で消えるが、保持期間の課金対象になるため確認する）
+for LOG_GROUP in \
+  "/aws/iot/session-03/rule-errors-raspi-${DEVICE_NUMBER}" \
+  "/aws/iot/session-03/lambda-rule-errors-raspi-${DEVICE_NUMBER}" \
+  "/aws/lambda/jawsug-s3-metrics-logger-raspi-${DEVICE_NUMBER}"; do
+  FOUND=$(aws logs describe-log-groups \
+    --log-group-name-prefix "$LOG_GROUP" \
+    --region "$REGION" \
+    --query "logGroups[?logGroupName=='${LOG_GROUP}'].logGroupName" \
+    --output text 2>/dev/null || echo "")
+  if [ -n "$FOUND" ] && [ "$FOUND" != "None" ]; then
+    echo "  ⚠️  ロググループが残っています: $LOG_GROUP"
     REMAINING=$((REMAINING + 1))
   fi
 done

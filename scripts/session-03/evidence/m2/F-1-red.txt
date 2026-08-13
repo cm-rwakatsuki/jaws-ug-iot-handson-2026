@@ -1,0 +1,54 @@
+# F-1 Red: リソース名の分離検証テスト（D-12 / R6-6 / NFR-8）
+# 実施日時: 2026-08-10 07:25 JST
+# 期待: 基本テンプレートの RuleErrorLogGroup が DeviceNumber を含まないため失敗する
+
+============================= test session starts ==============================
+platform darwin -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/scripts/session-03
+configfile: pytest.ini
+collecting ... collected 3 items
+
+tests/test_templates.py::TestResourceNameIsolation::test_all_resource_names_include_device_number[basic] FAILED [ 33%]
+tests/test_templates.py::TestResourceNameIsolation::test_all_resource_names_include_device_number[lambda] PASSED [ 66%]
+tests/test_templates.py::TestResourceNameIsolation::test_all_resource_names_include_device_number[alarm] PASSED [100%]
+
+=================================== FAILURES ===================================
+_ TestResourceNameIsolation.test_all_resource_names_include_device_number[basic] _
+
+self = <tests.test_templates.TestResourceNameIsolation object at 0x10627c0d0>
+template_path = PosixPath('/Users/shiraiyuuji/Workspace/Private/GitRepo/jaws-ug-iot-handson-2026/cfn/session-03/iot-rules-cloudwatch.yaml')
+
+    @pytest.mark.parametrize(
+        "template_path",
+        [BASIC_TEMPLATE, LAMBDA_TEMPLATE, ALARM_TEMPLATE],
+        ids=["basic", "lambda", "alarm"],
+    )
+    def test_all_resource_names_include_device_number(self, template_path):
+        """明示的に名前を付けた全リソースが ${DeviceNumber} を含む。"""
+        template = load_template(template_path)
+        named = collect_named_resources(template)
+    
+        # 名前を明示しているリソースが 1 つ以上あること（テスト自体の妥当性確認）
+        assert named, f"{template_path.name} に名前付きリソースが見つかりません"
+    
+        violations = [
+            f"{logical_id}.{prop} = {name!r}"
+            for logical_id, prop, name in named
+            if "${DeviceNumber}" not in name
+        ]
+    
+>       assert not violations, (
+            f"{template_path.name}: 以下のリソース名が DeviceNumber を含んでいません。\n"
+            "同一アカウントで複数の参加者が作成すると衝突します（D-12・NFR-8）。\n  "
+            + "\n  ".join(violations)
+        )
+E       AssertionError: iot-rules-cloudwatch.yaml: 以下のリソース名が DeviceNumber を含んでいません。
+E         同一アカウントで複数の参加者が作成すると衝突します（D-12・NFR-8）。
+E           RuleErrorLogGroup.LogGroupName = '/aws/iot/session-03/rule-errors'
+E       assert not ["RuleErrorLogGroup.LogGroupName = '/aws/iot/session-03/rule-errors'"]
+
+tests/test_templates.py:156: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_templates.py::TestResourceNameIsolation::test_all_resource_names_include_device_number[basic]
+========================= 1 failed, 2 passed in 0.05s ==========================

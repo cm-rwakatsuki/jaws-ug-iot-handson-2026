@@ -1,8 +1,17 @@
-"""シミュレーター — 実機なし参加者用（R1-9）。
+"""シミュレーター — 運営用の予備ツール（参加者向けではない）。
 
-同一トピック・同一ペイロード形式で、CPU/メモリを疑似生成する。
+2026-08-13 の前提変更により、参加者は全員が会場で実機（Raspberry Pi）を操作する。
+本スクリプトは参加者向けの提供物ではなく、次の 2 つの用途に限定する。
+
+1. 当日、貸出 Raspberry Pi が故障・接続不能になったときの運営側のバックアップ
+2. 実機を用意できない開発・検証環境から AWS 側の経路
+   （Rules → CloudWatch / Lambda / Alarm）を確認する用途
+
+同一トピック・同一ペイロード形式で CPU/メモリを疑似生成する。
 --spike-after / --spike-duration / --spike-level で高負荷区間を再現し、
-実機なしでもアドバンス B のアラーム発火まで到達できる。
+実機なしでもアラーム発火まで到達できる。
+
+手順書（docs/session-03/handson.md）には記載しない。
 """
 
 import argparse
@@ -36,7 +45,7 @@ KEY_FILE = f"{CERT_DIR}/private.pem.key"
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="IoT メトリクスシミュレーター（実機なし参加者用）"
+        description="IoT メトリクスシミュレーター（運営用の予備ツール）"
     )
     parser.add_argument(
         "--spike-after",
