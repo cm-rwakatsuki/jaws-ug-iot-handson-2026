@@ -28,9 +28,16 @@ CONFIG_SCRIPTS = [
 PLACEHOLDER_ENDPOINT = re.compile(r'^x+-ats\.iot\.[a-z0-9-]+\.amazonaws\.com$')
 REAL_ENDPOINT = re.compile(r'\b([a-z0-9]{8,})-ats\.iot\.[a-z0-9-]+\.amazonaws\.com\b')
 
+# PEM ブロックのパターンは文字列連結で組み立てる。
+# リテラルのまま書くと、このテストファイル自身がパターンに一致して
+# 自分を「機微情報あり」と誤検出してしまう。
+_DASHES = "-" * 5
+PEM_PRIVATE = re.compile(_DASHES + "BEGIN " + r"[A-Z ]*PRIVATE KEY" + _DASHES)
+PEM_CERT = re.compile(_DASHES + "BEGIN " + "CERTIFICATE" + _DASHES)
+
 SECRET_PATTERNS = [
-    ("秘密鍵ブロック", re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----')),
-    ("証明書ブロック", re.compile(r'-----BEGIN CERTIFICATE-----')),
+    ("秘密鍵ブロック", PEM_PRIVATE),
+    ("証明書ブロック", PEM_CERT),
     ("AWS アクセスキー ID", re.compile(r'\b(?:AKIA|ASIA|AIDA|AROA)[0-9A-Z]{12,}\b')),
     ("AWS アカウント ID（12 桁）", re.compile(r'(?<!\d)\d{12}(?!\d)')),
 ]
