@@ -578,7 +578,7 @@ M3 と M4 は M2 完了後に並行実施可能。
   - [x] ローカル `certs/` 削除
   - [x] 残存確認結果の表示（Thing / ルール / スタック / SNS トピック）
   - [x] **CloudWatch Metrics には削除 API がなく保持期間経過で消える**ことを出力で明示
-  - [ ] `DEVICE_NUMBER=001 bash teardown.sh` で実行できることを確認 → 🔴 **未実行（AWS 環境が必要）**
+  - [x] `DEVICE_NUMBER=001 bash teardown.sh` で実行できることを確認 → ✅ **3 スタック構成で完了（2026-08-14）**。中断→再実行でも続きから片付くこと（冪等）を CloudTrail で実証
   - [x] 手順書の後片付けセクション → ✅ **スクリプト版とコンソール版の両方を記載**（D-14 に沿って UI 手順も用意）
   - _Requirements: R8-7, R8-8, R8-9_ / _Design: 5.4_
 - [ ] **5.9** ルート `README.md` を更新する → 🔴 **未着手**（実測不要・**今すぐ着手可**／`next-actions.md` A-2）

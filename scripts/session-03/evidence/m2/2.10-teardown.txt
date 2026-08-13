@@ -1,7 +1,7 @@
-# M2-5 スタック削除の確認（タスク 2.10）＋ teardown.sh の初回実行
-# 実施日時: 2026-08-13 14:04:54 JST
-# 実行: echo y | DEVICE_NUMBER=001 bash teardown.sh
-# 注: 初回試行は呼び出し側の sed がロケールエラーで落ち SIGPIPE により中断（何も削除されず）。本実行が有効な試行。
+# M2-5 / 5.8 teardown.sh の実行（3 スタック構成）
+# 実施日時: 2026-08-14 02:53:39 JST
+# 前提: Basic / Advanced Course1 / Advanced Course2 の 3 スタックが CREATE_COMPLETE
+# 修正後の teardown.sh（F-3d / F-3e / F-3f 対応済み）での検証
 
 === JAWS-UG IoT Handson 第3回 - 後片付け ===
 Device Number: 001
@@ -12,9 +12,9 @@ Thing: jawsug-raspi-001  /  Region: ap-northeast-1
   - IoT Policy: jawsug-s3-policy-raspi-001
   - Thing にアタッチされた証明書
   - CloudFormation スタック:
-    - ��アドバンス B: 存在する場合）
-    - ��アドバンス A: 存在する場合）
-    - ��基本編）
+    - jawsug-iot-handson-s3-alarm-001（Advanced Course2: 存在する場合）
+    - jawsug-iot-handson-s3-lambda-001（Advanced Course1: 存在する場合）
+    - jawsug-iot-handson-s3-001（Basic Course）
   - ローカル certs/ ディレクトリ
 
 
@@ -22,16 +22,19 @@ Thing: jawsug-raspi-001  /  Region: ap-northeast-1
 ✅ AWS 認証情報確認済み
 
 [1/5] 証明書を削除しています...
-✅ 証明書の削除完了
+  ⚠️  この Thing / ポリシーに紐付く証明書は見つかりませんでした（スキップ）
+     証明書を発行したのにアタッチしていない場合は、この方法では検出できません。
+     IoT Core > セキュリティ > 証明書 で、紐付けのない証明書が残っていないか確認してください。
 
 [2/5] CloudFormation スタックを削除しています...
   ⚠️  jawsug-iot-handson-s3-alarm-001 は存在しません（スキップ）
-  ⚠️  jawsug-iot-handson-s3-lambda-001 は存在しません（スキップ）
+  jawsug-iot-handson-s3-lambda-001 を削除中...
+  ✅ jawsug-iot-handson-s3-lambda-001 削除完了
   jawsug-iot-handson-s3-001 を削除中...
   ✅ jawsug-iot-handson-s3-001 削除完了
 
 [3/5] Thing を確認しています...
-✅ Thing の削除完了
+⚠️  Thing は存在しません（スタック削除時に消えたか、もともと未作成）
 
 [4/5] ローカルの証明書ファイルを削除しています...
 ✅ certs/ を削除しました
@@ -47,4 +50,4 @@ Thing: jawsug-raspi-001  /  Region: ap-northeast-1
    データポイントは 15 日後に期限切れになります）。
    CloudWatch Alarm はスタック削除で消えるため、月額課金は停止しています。
 
-teardown.sh 終了コード: 0
+終了コード: 0
