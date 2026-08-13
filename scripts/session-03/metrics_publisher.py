@@ -50,26 +50,30 @@ def check_cert_files():
             sys.exit(1)
 
 
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
-        print(f"[OK] Connected to AWS IoT Core")
+# コールバックは paho-mqtt 2.x の Callback API VERSION2 形式で書く。
+# 旧形式（引数が少ない形）だと起動時に DeprecationWarning が表示される。
+def on_connect(client, userdata, connect_flags, reason_code, properties):
+    if reason_code == 0:
+        print("[OK] Connected to AWS IoT Core")
     else:
-        print(f"[ERROR] Connection failed: rc={rc}")
+        print(f"[ERROR] Connection failed: {reason_code}")
 
 
-def on_disconnect(client, userdata, rc):
-    if rc != 0:
-        print(f"[WARN] Unexpected disconnection (rc={rc}). Reconnecting...")
+def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
+    if reason_code != 0:
+        print(f"[WARN] Unexpected disconnection ({reason_code}). Reconnecting...")
 
 
-def on_publish(client, userdata, mid):
+def on_publish(client, userdata, mid, reason_code, properties):
     pass  # 送信確認は標準出力で行うため、ここでは何もしない
 
 
 def main():
     check_cert_files()
 
-    client = mqtt.Client(client_id=f"jawsug-{DEVICE_ID}")
+    client = mqtt.Client(
+        mqtt.CallbackAPIVersion.VERSION2, client_id=f"jawsug-{DEVICE_ID}"
+    )
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
     client.on_publish = on_publish

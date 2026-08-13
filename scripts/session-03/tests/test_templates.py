@@ -257,6 +257,23 @@ class TestLambdaTemplate:
         error_action = rule["Properties"]["TopicRulePayload"].get("ErrorAction")
         assert error_action is not None
 
+    def test_rule_depends_on_invoke_permission(self, template):
+        """ルールが Lambda 呼び出し権限より後に作られること。
+
+        両者に依存関係がないと CloudFormation は並列に作成するため、
+        ルールが先に有効になった数秒間 Lambda の呼び出しが権限不足で失敗し、
+        ErrorAction ログに不要なエラーが記録される（参加者が混乱する）。
+        SourceArn は文字列で組み立てており循環参照にならないので DependsOn を張れる。
+        """
+        rule = template["Resources"]["MetricsToLambdaRule"]
+        depends = rule.get("DependsOn")
+        if isinstance(depends, str):
+            depends = [depends]
+        assert depends and "LambdaInvokePermission" in depends, (
+            "MetricsToLambdaRule に DependsOn: LambdaInvokePermission がありません。"
+            "権限付与前にルールが有効になると Lambda 呼び出しが一時的に失敗します"
+        )
+
 
 # ============================================================
 # Alarm テンプレートの構造検証

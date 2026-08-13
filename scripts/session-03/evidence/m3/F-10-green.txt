@@ -1,0 +1,12 @@
+# F-10 Green
+# 実施日時: 2026-08-14 01:18 JST
+
+.....................                                                    [100%]
+21 passed in 2.10s
+
+cfn-lint: 合格
+
+validate-template Capabilities: CAPABILITY_NAMED_IAM
+
+............                                                             [100%]
+84 passed in 2.00s

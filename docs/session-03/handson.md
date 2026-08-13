@@ -418,7 +418,7 @@ scp certs/* jawsug-user@raspi.local:~/session-03/certs/
 cd ~/session-03
 python3 -m venv venv
 source venv/bin/activate
-pip install paho-mqtt psutil
+pip install "paho-mqtt>=2.0" psutil
 chmod +x show_metrics.sh
 ```
 
@@ -446,14 +446,16 @@ sudo timedatectl set-timezone Asia/Tokyo
 timedatectl   # 変わったことを確認
 ```
 
-🔎 出力例：
+出力例：
 
 ```
-               Local time: Thu 2026-08-13 21:00:00 JST
-           Universal time: Thu 2026-08-13 12:00:00 UTC
+               Local time: Thu 2026-08-13 20:58:08 JST
+           Universal time: Thu 2026-08-13 11:58:08 UTC
+                 RTC time: n/a
                 Time zone: Asia/Tokyo (JST, +0900)
 System clock synchronized: yes
               NTP service: active
+          RTC in local TZ: no
 ```
 
 > 💡 `sudo raspi-config` →「Localisation Options」→「Timezone」→ Asia → Tokyo でも変更できます。
@@ -471,7 +473,7 @@ source venv/bin/activate   # まだ venv に入っていない場合
 python3 metrics_publisher.py
 ```
 
-🔎 出力例：
+出力例：
 
 ```
 Connecting to xxxxxx-ats.iot.ap-northeast-1.amazonaws.com...
@@ -479,9 +481,11 @@ Connecting to xxxxxx-ats.iot.ap-northeast-1.amazonaws.com...
   Interval: 10s
 
 [OK] Connected to AWS IoT Core
-[SEND] 2026-08-13 14:30:10 JST cpu=12.4% memory=38.1%
-[SEND] 2026-08-13 14:30:20 JST cpu=11.8% memory=38.2%
+[SEND] 2026-08-13 21:00:25 JST cpu=1.5% memory=30.9%
+[SEND] 2026-08-13 21:00:35 JST cpu=1.8% memory=30.9%
 ```
+
+負荷をかけていないときの CPU は数 % 程度です。メモリは機体によって変わります（2GB モデルで 30% 前後）。
 
 **この画面はそのまま出しっぱなしにしておきます。** ここに表示されている値が、あとで CloudWatch のグラフと突き合わせる「送信値」になります。
 
@@ -527,9 +531,24 @@ MemoryUtilization-raspi-001
 
 ### 2. 期間を 1 分に変更する（重要）
 
-🔎 グラフ下の「**グラフ化したメトリクス**」タブを開き、「**期間**」列を **`1 分`** に変更します。あわせて「**統計**」列が「**平均**」になっていることを確認してください。
+グラフ下の「**グラフ化したメトリクス (2 個)**」タブを開きます。
 
-> ⚠️ **右上にある `⟳ 1 分` と間違えないでください。** こちらは**グラフの自動更新間隔**で、メトリクスの集計期間ではありません。どちらも「1 分」と表示されるので紛らわしいのですが、変更したいのは「グラフ化したメトリクス」タブ側の**期間**です。
+タブの**右上にあるドロップダウン**で、2 つのメトリクスをまとめて設定できます。
+
+| 設定 | 値 |
+|---|---|
+| **統計** | `平均` |
+| **期間** | **`1 分`** |
+
+メトリクスごとに変えたい場合は、表の「**統計**」列・「**期間**」列からも変更できます。
+
+```
+ラベル                        統計      期間
+CpuUtilization-raspi-001      平均 ▼   1 分 ▼
+MemoryUtilization-raspi-001   平均 ▼   1 分 ▼
+```
+
+> ⚠️ **グラフ右上にある `⟳ 1 分` と間違えないでください。** こちらは**グラフの自動更新間隔**で、メトリクスの集計期間ではありません。どちらも「1 分」と表示されるので紛らわしいのですが、変更したいのは「グラフ化したメトリクス」タブ側の**期間**です。
 
 > ⚠️ 期間が `5 分`のままだと、**このあとの負荷の変化がグラフでほとんど見えません。** 3 分の負荷が 5 分平均で薄まってしまいます。
 
@@ -707,21 +726,51 @@ Memory : 31.1 %   ((total - available) / total)
 
 送信スクリプトを動かしたまま、ログを見ます。
 
-1. 🔎 **CloudWatch** → 左メニュー「**ログ**」→「**ログ管理**」→ ロググループ
+1. **CloudWatch** → 左メニュー「**ログ**」→「**ログ管理**」→ ロググループ
    `/aws/lambda/jawsug-s3-metrics-logger-raspi-001`
 2. 最新のログストリームを開く
 
-🔎 次のような JSON が 1 行ずつ出力されます。
+次のようなログイベントが並びます。
 
-```json
-{"level":"INFO","event":"metrics_received","deviceId":"raspi-001","cpu":92.4,"memory":41.8,"timestamp":1786280400,"topic":"jawsug/session-03/raspi-001/metrics"}
 ```
+START RequestId: a14f6e26-2f37-453b-9466-b03a2abb3a0a Version: $LATEST
+{
+    "level": "INFO",
+    "event": "metrics_received",
+    "deviceId": "raspi-001",
+    "cpu": 0.8,
+    "memory": 29.2,
+    "timestamp": 1786638150,
+    "topic": "jawsug/session-03/raspi-001/metrics"
+}
+END RequestId: a14f6e26-2f37-453b-9466-b03a2abb3a0a
+REPORT RequestId: a14f6e26-... Duration: 1.40 ms  Billed Duration: 2 ms  Memory Size: 128 MB  Max Memory Used: 36 MB
+```
+
+**確認ポイント**
+
+| 見るところ | 分かること |
+|---|---|
+| `timestamp` が 10 ずつ増える | 10 秒間隔で届いている（`1786638150` → `160` → `170`） |
+| `topic` | どのデバイスから来たか。Lambda では SQL で `topic()` を選んだのでイベントに入っている |
+| `Duration: 1.40 ms` | 処理は 1〜2 ミリ秒。**課金は 2 ms**（1 ms 単位で切り上げ） |
+| `Max Memory Used: 36 MB` | 128 MB 割り当てに対して実使用 36 MB。設定に余裕がある |
+
+> 💡 Lambda のコードは `json.dumps()` で**1 行**の JSON を出力していますが、**コンソールが自動で整形して表示**します。生の 1 行のまま扱いたいときは次の「ログ分析」で検索します。
+
+> 💡 この規模なら Lambda は**無料枠に収まります**。2 時間動かしても約 720 回 × 2 ms × 128 MB ＝ 0.18 GB-秒で、月 400,000 GB-秒の無料枠に対してごくわずかです。
 
 ### 4. ログ分析（Logs Insights）で検索する
 
-1. 🔎 **CloudWatch** → 左メニュー「**ログ**」→「**ログ分析**」（従来の Logs Insights）
-2. ロググループに `/aws/lambda/jawsug-s3-metrics-logger-raspi-001` を選択
-3. 次のクエリを貼って「**クエリの実行**」
+1. **CloudWatch** → 左メニュー「**ログ**」→「**ログ分析**」（従来の Logs Insights）
+
+> � 初回は「**新しい Log Analytics エクスペリエンスへようこそ**」という案内が出ます。「**OK**」で進めて問題ありません（従来の画面に戻したい場合は「オプトアウト」を選べます）。
+
+2. 「**ロググループ**」から `/aws/lambda/jawsug-s3-metrics-logger-raspi-001` を選択
+
+> ⚠️ ロググループを選ぶと、エディタの 1 行目に **`SOURCE "arn:aws:logs:..." START=-604800s END=0s |`** が**自動で入ります**。これは消さないでください。選んだロググループと検索範囲を表す行です。
+
+3. その下に続けて、次のクエリを貼ります。
 
 ```
 fields @timestamp, deviceId, cpu, memory
@@ -730,7 +779,30 @@ fields @timestamp, deviceId, cpu, memory
 | limit 20
 ```
 
-> 構造化ログ（JSON）で出力しておくと、こうしてフィールド名で検索・集計できます。`print` で文字列を並べるのではなく JSON で出す価値がここに出ます。
+エディタ全体はこうなります（1 行目は自動挿入分）。
+
+```
+SOURCE "arn:aws:logs:ap-northeast-1:<アカウントID>:log-group:/aws/lambda/jawsug-s3-metrics-logger-raspi-001" START=-604800s END=0s |
+fields @timestamp, deviceId, cpu, memory
+| filter event = "metrics_received"
+| sort @timestamp desc
+| limit 20
+```
+
+4. 右下の「**実行**」をクリック
+
+結果がテーブルで表示されます。
+
+```
+@timestamp                       deviceId    cpu   memory
+2026-08-14T01:24:30.841+09:00    raspi-001   0.5   29.2
+2026-08-14T01:24:20.818+09:00    raspi-001   1.3   29.2
+2026-08-14T01:24:10.801+09:00    raspi-001   1.3   29.2
+```
+
+> 構造化ログ（JSON）で出力しておくと、こうして**フィールド名で検索・並べ替え・集計**できます。`print` で文字列を並べるのではなく JSON で出す価値がここに出ます。`deviceId` や `cpu` が独立した列になっているのは、Lambda が JSON でログを書いているからです。
+
+> 💡 `limit 20` があるので最新 20 件までの表示です。画面下には「一致した N 件」「M レコードをスキャン」と出るので、どれだけのログを読んだかも分かります。
 
 ---
 

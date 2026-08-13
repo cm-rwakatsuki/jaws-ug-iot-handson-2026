@@ -12,7 +12,7 @@ Parameters:
     Default: "001"
     AllowedPattern: "^[0-9]{3}$"
     ConstraintDescription: "3桁の数字を入力してください（例: 001）"
-    Description: "デバイス番号（3桁数字）"
+    Description: "Device Number (3-digit number)"
 
 # ------------------------------------------------------------
 # リソース
@@ -127,8 +127,13 @@ Resources:
     DependsOn: MetricsLoggerLogGroup
 
   # IoT ルール（Lambda アクション）
+  # 呼び出し権限（LambdaInvokePermission）より後に作成する。
+  # 依存関係を張らないと CloudFormation が並列に作成し、権限付与前に
+  # ルールが有効になった数秒間だけ Lambda の呼び出しが失敗して
+  # ErrorAction ログに不要なエラーが残る。
   MetricsToLambdaRule:
     Type: AWS::IoT::TopicRule
+    DependsOn: LambdaInvokePermission
     Properties:
       RuleName: !Sub "jawsug_s3_metrics_to_lambda_raspi_${DeviceNumber}"
       TopicRulePayload:

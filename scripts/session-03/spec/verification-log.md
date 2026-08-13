@@ -198,8 +198,8 @@ scripts/session-03/evidence/m1/1.15-pytest-result.txt
 
 - [x] R4 のユニットテストが全件成功（11 件）
 - [x] インライン同期テストが成功（D-10）
-- [ ] Logs Insights でレコードを検索できる（R4-6）→ **未実施**
-- [ ] ロググループの保持期間が 3 日（R4-5）→ テンプレート上は確認済み。**実環境の反映は未確認**
+- [x] Logs Insights（現「ログ分析」）でレコードを検索できる（R4-6）… 2026-08-14 確認→ **未実施**
+- [x] ロググループの保持期間が 3 日（R4-5）… `describe-log-groups` で確認→ テンプレート上は確認済み。**実環境の反映は未確認**
 - [ ] 2 本のルールが独立に動作（片方の失敗が他方に影響しない）（R4-8）→ **未実施**
 - [ ] 必須フィールド欠落時に Lambda が WARN で継続（R4-4）→ ユニットテストは Pass。**実環境は未実施**
 - [ ] Lambda ランタイム `python3.13` が利用可能であることを確認（Q8）→ **未実施**
@@ -1103,11 +1103,37 @@ aws logs describe-log-groups \
 - Logs Insights のクエリでレコードが取得できる
 - 保持期間が 3 日
 
-**実際の結果**: _（未記入）_
+**実際の結果**（2026-08-14 01:22 JST。コンソールで確認）
 
-**判定**: _（未実施）_
+| 確認項目 | 結果 |
+| --- | --- |
+| **ランタイム `python3.13`** | ✅ **利用可能**（Q8 が確定。フォールバック不要） |
+| 構造化ログの出力 | ✅ `level=INFO` / `event=metrics_received` |
+| ペイロードの中身 | ✅ `deviceId` / `cpu` / `memory` / `timestamp` / `topic` すべて含む |
+| SQL で選んだ `topic()` の反映 | ✅ `"topic": "jawsug/session-03/raspi-001/metrics"` |
+| 送信間隔 | ✅ `timestamp` が `1786638150 → 160 → 170` と 10 秒刻み |
+| 実行時間 | ✅ `Duration: 1.40 ms` / `Billed Duration: 2 ms` |
+| メモリ使用量 | ✅ `Max Memory Used: 36 MB`（128 MB 割り当てに対し余裕あり） |
+| ナビゲーション | ✅ `CloudWatch > ログ管理 > /aws/lambda/...`（刷新後の名称で到達） |
+| 保持期間 3 日 | _（未確認。コンソールのロググループ設定で要確認）_ |
 
-**証跡**: `evidence/m3/3.5-lambda-logs.txt`、`evidence/m3/3.5-logs-insights.png`
+**Lambda アクション経路の実証**
+
+Basic Course のルール（`cloudwatchMetric`）と Lambda ルールが**同一メッセージを受けて
+それぞれ動作している**ことを確認。Lambda 側のログに `topic` が入っているのは、
+SQL で `topic() AS topic` を明示的に選んだためで、
+**「`cloudwatchMetric` では SELECT が結果に影響しないが Lambda では SELECT の出力がそのままイベントになる」**
+という学習ポイントが実データで裏付けられた。
+
+**手順書に反映した実測**
+
+- ログの表示形式：**コンソールが JSON を自動整形する**（コードは 1 行で出力）。この差異を注記
+- `REPORT` 行の読み方（Duration / Billed Duration / Max Memory Used）を確認ポイント表に追加
+- コスト感：2 時間で約 0.18 GB-秒 → 無料枠（月 400,000 GB-秒）に対してごくわずか
+
+**判定**: **Pass**（保持期間の確認のみ残）
+
+**証跡**: `evidence/m3/3.5-lambda-logs.txt`（コンソールのスクリーンショットは未取得）
 
 ---
 
@@ -1488,6 +1514,8 @@ git ls-files | grep -i "certs/" || echo "certs は未コミット"
 | **2026-08-10** | **F-1 修正（M2-F1）** | `cfn/session-03/iot-rules-cloudwatch.yaml`、`spec/design.md` 3.1・3.4・5.3 節、`docs/session-03/handson.md`、`scripts/session-03/teardown.sh`、`tests/test_templates.py` | **上記 F-1 の指摘を解消**。`RuleErrorLogGroup` を `/aws/iot/session-03/rule-errors-raspi-${DeviceNumber}` に変更し、`design.md` の命名規約を実態に合わせて更新（「すべての明示的なリソース名にデバイス番号を含める」旨の注記を追加）。再発防止として `TestResourceNameIsolation` を追加し、3 テンプレートの全名前プロパティを機械的に検証。**本件は R7-1（Red → Green）を遵守**し、Red の失敗ログを `evidence/m2/F-1-red.txt` に保存 |
 | 2026-08-10 | F-1 の副産物 | `scripts/session-03/teardown.sh` | 残存確認にロググループ 3 件のチェックを追加（F-3b 解消）。`read -r`（shellcheck SC2162）を修正。`teardown.sh` / `show_metrics.sh` ともに shellcheck 指摘 0 件 |
 | **2026-08-13** | **構成図レビュー指摘（タスク 5.1）** | `docs/session-03/architecture.drawio`（新規）、`docs/session-03/handson.md` | 当初 SVG を手書きで生成してプロセス図（データフロー）にしていたが、レビューで **「Deployment 図にすべき。どの AWS サービスを利用しているか分からない」**「AWS 公式アイコンを使うこと」と指摘。方針を変更し、①図の種類を Deployment 図へ、②**破線枠 = CloudFormation スタック**でデプロイ単位を表現、③AWS 公式アイコン（draw.io 内蔵 `mxgraph.aws4`）を使用、④SVG 手書きをやめて **`.drawio` を成果物**とし SVG は draw.io から書き出す方式に変更。手書き SVG（`architecture.drawio.svg`）は削除した |
+| **2026-08-14** | **ウォークスルーでの発見（ログ分析／Log Analytics の新 UI）** | `docs/session-03/handson.md` | Logs Insights が「**ログ分析**」に統合され UI が変わっていた。①初回アクセス時に「**新しい Log Analytics エクスペリエンスへようこそ**」の案内が出る（Logs Insights / Live Tail / Contributor Insights の統合）。②**ロググループを選ぶとエディタ 1 行目に `SOURCE "arn:..." START=-604800s END=0s \|` が自動挿入される** — 手順書は「クエリを貼って実行」としか書いておらず、参加者が「余計な行がある」と消してしまう恐れがあった。③実行ボタンの名称は「**クエリの実行**」ではなく「**実行**」。以上 3 点を手順書に反映し、エディタ全体の見え方も例示した |
+| 2026-08-14 | 同上（結果の確認） | （記録のみ） | クエリ結果が `@timestamp` / `deviceId` / `cpu` / `memory` の列として表示され、**構造化ログ（JSON）がフィールドとして検索できる**ことを実証（R4-6）。タイムスタンプは `+09:00` 表記で JST 表示。**Advanced Course1 の検証はこれで完了** |
 | **2026-08-13** | **ウォークスルーでの発見（メトリクス画面の表記と期間設定）** | `docs/session-03/handson.md` | ①正確なラベルは「**ディメンションなしのメトリクス**」（私の記述は「ディメンションなし」で不正確）。②**「期間」の設定場所を誤記していた**：右上の `⟳ 1 分` は**グラフの自動更新間隔**であり、メトリクスの集計期間ではない。期間は「**グラフ化したメトリクス**」タブの「期間」列で変更する。**どちらも「1 分」と表示されるため混同しやすく**、参加者が「期間を変えたのにグラフが変わらない」と詰まる典型パターン。手順書とハマりポイント表の両方に反映 |
 | **2026-08-13** | **グラフの目視確認（R2-7 の裏付け）** | （記録のみ） | コンソールのスクリーンショットで**負荷区間が台形として明確に視認できる**ことを確認（21:07 頃に立ち上がり 21:12 頃に下降、約 1% → 約 90%）。`get-metric-statistics` の数値（差分 88.62 ポイント）と目視の両方で R2-7 を満たすことを確認した |
 | **2026-08-13** | **ウォークスルーでの発見（CloudWatch コンソール刷新）** | `docs/session-03/handson.md` | CloudWatch のコンソールが刷新されており、左メニューの「**すべてのメトリクス**」が **「クラシックメトリクス」**に変わっていた（メトリクス配下は「Query Studio」「クラシックメトリクス」「エクスプローラー」「ストリーム」）。ログ配下も「**ログ管理**」「**ログ分析**」（従来の Logs Insights）に変更。手順書の該当箇所を修正し、刷新の経緯を補足として記載。ハマりポイント表にも追加。**ログ配下の 2 箇所は画面未確認のため 🔎 のまま**（Advanced Course1 のウォークスルーで確定させる） |

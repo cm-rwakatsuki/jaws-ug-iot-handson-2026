@@ -73,11 +73,12 @@ def generate_value(base: float, jitter: float = 3.0) -> float:
     return round(base + random.uniform(-jitter, jitter), 1)
 
 
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
+# コールバックは paho-mqtt 2.x の Callback API VERSION2 形式（DeprecationWarning 回避）
+def on_connect(client, userdata, connect_flags, reason_code, properties):
+    if reason_code == 0:
         print("[OK] Connected to AWS IoT Core")
     else:
-        print(f"[ERROR] Connection failed: rc={rc}")
+        print(f"[ERROR] Connection failed: {reason_code}")
 
 
 def main():
@@ -89,7 +90,9 @@ def main():
             print(f"[ERROR] 証明書が見つかりません: {path}")
             sys.exit(1)
 
-    client = mqtt.Client(client_id=f"jawsug-{DEVICE_ID}")
+    client = mqtt.Client(
+        mqtt.CallbackAPIVersion.VERSION2, client_id=f"jawsug-{DEVICE_ID}"
+    )
     client.on_connect = on_connect
     client.reconnect_delay_set(min_delay=1, max_delay=60)
 

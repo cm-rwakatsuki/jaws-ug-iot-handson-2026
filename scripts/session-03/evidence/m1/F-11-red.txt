@@ -1,0 +1,19 @@
+# F-11 Red: paho-mqtt の Callback API version 1 による DeprecationWarning
+# 実施日時: 2026-08-14 01:44 JST
+
+E             At index 2 diff: 'flags' != 'connect_flags'
+E             Right contains one more item: 'properties'
+E             
+E             Full diff:
+E               [
+E                   'client',...
+E             
+E             ...Full output truncated (8 lines hidden), use '-vv' to show
+
+tests/test_publisher_api.py:54: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_publisher_api.py::test_uses_callback_api_version2[metrics_publisher]
+FAILED tests/test_publisher_api.py::test_uses_callback_api_version2[simulator]
+FAILED tests/test_publisher_api.py::test_callback_signatures_match_version2[metrics_publisher]
+FAILED tests/test_publisher_api.py::test_callback_signatures_match_version2[simulator]
+============================== 4 failed in 0.05s ===============================
