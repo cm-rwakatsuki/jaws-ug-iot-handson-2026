@@ -43,7 +43,6 @@ JAWS-UG IoT 専門支部 IoT Core ハンズオン（全3回）のハンズオン
 │       ├── lambda/
 │       │   └── metrics_logger.py    # Lambda ハンドラ（構造化ログ出力）
 │       ├── tests/               # ユニットテスト（pytest）
-│       ├── spec/                # 要件・設計・タスク・検証記録
 │       └── requirements-dev.txt # 開発用の依存パッケージ
 └── cfn/
     ├── session-01/
@@ -73,5 +72,3 @@ pip install -r requirements-dev.txt
 pytest                              # ユニットテスト
 cfn-lint ../../cfn/session-03/*.yaml   # テンプレートの静的検証
 ```
-
-要件・設計・実装計画・検証記録は [scripts/session-03/spec/](scripts/session-03/spec/) にあります。
