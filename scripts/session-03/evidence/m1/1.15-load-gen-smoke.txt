@@ -1,25 +1,0 @@
-# M1 load_gen.py CLI スモークテスト（開発機 macOS 上・短時間）
-# 実施日時: 2026-08-08 23:55 JST
-
-$ python3 load_gen.py cpu --target 40 --duration 6
-[CPU LOAD] 目標: 40.0%  コア数: 10  duty: 0.40
-[CPU LOAD] 開始: 2026-08-08 23:55:55 JST
-[CPU LOAD] 終了予定: 2026-08-08 23:56:01 JST
-[CPU LOAD] 継続時間: 6秒
-
-  [   0s / 6s] CPU: 62.7%  [   1s / 6s] CPU: 49.9%  [   2s / 6s] CPU: 53.4%  [   3s / 6s] CPU: 51.8%  [   4s / 6s] CPU: 50.6%  [   5s / 6s] CPU: 55.4%
-[CPU LOAD] 実終了: 2026-08-08 23:56:01 JST
-[CPU LOAD] 完了。負荷を解放しました。
-
-$ python3 load_gen.py memory --mb 128 --duration 4
-[MEMORY LOAD] 確保目標: 128 MB / 総容量: 65536 MB
-[MEMORY LOAD] 開始: 2026-08-08 23:56:01 JST
-[MEMORY LOAD] 終了予定: 2026-08-08 23:56:05 JST
-[MEMORY LOAD] 継続時間: 4秒
-
-  メモリを確保中... (128 MB)
-  確保完了。保持中...
-
-  [   0s / 4s] Memory: 50.2%  [   1s / 4s] Memory: 50.2%  [   2s / 4s] Memory: 50.2%  [   3s / 4s] Memory: 50.1%
-[MEMORY LOAD] 実終了: 2026-08-08 23:56:05 JST
-[MEMORY LOAD] 完了。メモリを解放しました。

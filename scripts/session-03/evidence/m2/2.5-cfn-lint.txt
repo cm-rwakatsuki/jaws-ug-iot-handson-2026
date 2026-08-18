@@ -1,9 +1,0 @@
-# M2-0 テンプレート静的検証（タスク 2.5 / 4.2）
-# 実施日時: 2026-08-08 23:55 JST
-
-$ cfn-lint --version
-cfn-lint 1.54.0
-
-$ cfn-lint ../../cfn/session-03/*.yaml
-exit code: 0
-（出力なし・exit 0 = 3 テンプレートすべて合格）
