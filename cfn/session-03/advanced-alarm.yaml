@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  JAWS-UG IoT Handson Session 3 (Advanced B) - CloudWatch Alarm to SNS Email.
+  Creates CloudWatch Alarm on CPU metric and sends notification via SNS Email.
+
+# ------------------------------------------------------------
+# パラメータ
+# ------------------------------------------------------------
+Parameters:
+  DeviceNumber:
+    Type: String
+    Default: "001"
+    AllowedPattern: "^[0-9]{3}$"
+    ConstraintDescription: "3桁の数字を入力してください（例: 001）"
+    Description: "Device Number (3-digit number)"
+
+  MetricNamespace:
+    Type: String
+    Default: "JAWSUG/IoTHandson"
+    Description: "CloudWatch Metrics namespace (specify the same value as in the Basics section)"
+
+  NotificationEmail:
+    Type: String
+    AllowedPattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+    ConstraintDescription: "有効なメールアドレスを入力してください"
+    Description: "Email address for alarm notifications (You will receive a confirmation email after creating the stack)"
+
+  CpuAlarmThreshold:
+    Type: Number
+    Default: 80
+    Description: "CPU Usage Alarm Threshold (%)"
+
+  AlarmPeriodSeconds:
+    Type: Number
+    Default: 60
+    MinValue: 60
+    Description: "Alarm evaluation period (seconds). Must be 60 or greater for standard-resolution metrics."
+
+  AlarmEvaluationPeriods:
+    Type: Number
+    Default: 1
+    Description: "Number of Alarm Evaluations"
+
+  EnableOkNotification:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: "ALARM → OK: Enable notifications when the system returns to normal?"
+
+# ------------------------------------------------------------
+# Conditions
+# ------------------------------------------------------------
+Conditions:
+  OkNotificationEnabled:
+    !Equals [!Ref EnableOkNotification, "true"]
+
+# ------------------------------------------------------------
+# リソース
+# ------------------------------------------------------------
+Resources:
+
+  # SNS トピック
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "jawsug-s3-alarm-raspi-${DeviceNumber}"
+      DisplayName: "JAWSUG-IoT-Handson"
+
+  # Email サブスクリプション（作成時に確認メールが送信される）
+  AlarmEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+  # CloudWatch Alarm（CPU 使用率）
+  CpuHighAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "jawsug-s3-cpu-high-raspi-${DeviceNumber}"
+      AlarmDescription: !Sub "CPU utilization exceeds ${CpuAlarmThreshold}% for raspi-${DeviceNumber}"
+      Namespace: !Ref MetricNamespace
+      MetricName: !Sub "CpuUtilization-raspi-${DeviceNumber}"
+      Statistic: Average
+      Period: !Ref AlarmPeriodSeconds
+      EvaluationPeriods: !Ref AlarmEvaluationPeriods
+      Threshold: !Ref CpuAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+      OKActions:
+        !If
+          - OkNotificationEnabled
+          - - !Ref AlarmTopic
+          - !Ref "AWS::NoValue"
+
+# ------------------------------------------------------------
+# 出力
+# ------------------------------------------------------------
+Outputs:
+  AlarmTopicArn:
+    Description: "SNS Topic ARN for alarm notifications"
+    Value: !Ref AlarmTopic
+
+  AlarmName:
+    Description: "CloudWatch Alarm name"
+    Value: !Sub "jawsug-s3-cpu-high-raspi-${DeviceNumber}"
+
+  AlarmConsoleUrl:
+    Description: "CloudWatch Alarm console URL"
+    Value: !Sub "https://ap-northeast-1.console.aws.amazon.com/cloudwatch/home?region=ap-northeast-1#alarmsV2:alarm/jawsug-s3-cpu-high-raspi-${DeviceNumber}"
+
+  ConfirmSubscriptionNote:
+    Description: "Important: Subscription confirmation required"
+    Value: !Sub >
+      [重要] ${NotificationEmail} に確認メール（件名: AWS Notification - Subscription Confirmation）
+      が届いています。リンクをクリックして承認してください。
+      承認前はアラームが発火してもメールは届きません。
+      差出人: no-reply@sns.amazonaws.com（迷惑メールフォルダも確認してください）

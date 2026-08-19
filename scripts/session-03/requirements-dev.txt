@@ -1,0 +1,5 @@
+pytest>=7.0
+psutil>=5.9
+cfn-lint>=0.80
+pyyaml>=6.0
+paho-mqtt>=2.0
